@@ -3,10 +3,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Icon } from '@/components/icon';
 import { ConvexError } from 'convex/values';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button, Card, Screen, Txt } from '@/components/ui';
-import { Palette, Type } from '@/constants/dumpling';
+import { Palette } from '@/constants/dumpling';
 import { BottomTabInset } from '@/constants/theme';
 import { useSession } from '@/lib/session';
 import { api } from '../../../convex/_generated/api';
@@ -15,6 +16,14 @@ import type { Id } from '../../../convex/_generated/dataModel';
 function formatWeek(weekOf: string) {
   const [y, m, d] = weekOf.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+}
+
+function FeastCover({ url, onPlay }: { url: string; onPlay: () => void }) {
+  const player = useVideoPlayer(url);
+  return <Pressable accessibilityRole="button" accessibilityLabel="Play this family Feast" onPress={onPlay} style={{ alignSelf: 'stretch', aspectRatio: 4 / 3, borderRadius: 12, overflow: 'hidden' }}>
+    <VideoView player={player} nativeControls={false} contentFit="cover" style={StyleSheet.absoluteFill} />
+    <View style={{ position: 'absolute', bottom: 16, left: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' }}><Icon name="play" color={Palette.card} /></View>
+  </Pressable>;
 }
 
 export default function Feast() {
@@ -26,6 +35,10 @@ export default function Feast() {
   const retry = useMutation(api.feasts.retry);
   const play = (id: Id<'feasts'>) => router.push({ pathname: '/player/[id]', params: { id } });
 
+  const current = feasts?.[0];
+  const episode = useQuery(api.feasts.get, auth && current?.status === 'ready' ? { ...auth, feastId: current.id } : 'skip');
+  const coverClip = episode?.segments.find((segment) => segment.type === 'clip' && segment.dumpling.mediaType === 'video');
+  const coverMedia = coverClip?.type === 'clip' ? coverClip.dumpling : null;
   if (!feasts) {
     return (
       <Screen scroll={false}>
@@ -43,11 +56,10 @@ export default function Feast() {
 
   return (
     <Screen bottomInset={BottomTabInset}>
-      <View style={{ gap: 8 }}><Txt variant="hero">The Sunday edition.</Txt><Txt variant="small">A little of everyone. All together.</Txt></View>
+      <View style={{ gap: 8 }}><Txt variant="hero">Your family album.</Txt><Txt variant="small">A week of little things. Yours to keep.</Txt></View>
       {latest ? (
         <Card style={styles.hero}>
-          <View style={styles.cover}><Txt variant="small" style={{ color: Palette.creamDeep }}>Made around your Table</Txt><Txt style={styles.coverWord}>Sunday,
-with love.</Txt><View style={{ width: 32, height: 1, backgroundColor: Palette.creamDeep, marginTop: 12 }} /></View>
+          {coverMedia?.url && <FeastCover url={coverMedia.url} onPlay={() => play(latest.id)} /> }
           <Txt variant="small">Week of {formatWeek(latest.weekOf)}</Txt>
           <Txt variant="hero" style={{ textAlign: 'left', alignSelf: 'stretch' }} testID="latest-feast-title">
             {latest.title}
@@ -72,8 +84,7 @@ with love.</Txt><View style={{ width: 32, height: 1, backgroundColor: Palette.cr
         </Card>
       ) : (
         <Card style={styles.hero}>
-          <View style={styles.cover}><Txt style={styles.coverWord}>The first
-of many Sundays.</Txt></View>
+
           <Txt variant="title">Your first Feast starts here</Txt>
           <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Fold a few moments, then let the Chef bring them together. You can try a first episode before Sunday.</Txt>
         </Card>
@@ -113,9 +124,6 @@ of many Sundays.</Txt></View>
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hero: { alignItems: 'flex-start', gap: 16, paddingVertical: 0, paddingBottom: 24 },
-  cover: { alignSelf: 'stretch', minHeight: 240, borderRadius: 4, backgroundColor: '#626B5B', alignItems: 'flex-start', justifyContent: 'center', gap: 16, padding: 28 },
-  coverWord: { fontFamily: Type.display, fontSize: 42, lineHeight: 48, color: Palette.cream, fontWeight: '400' },
-  coverRing: { borderWidth: 1, borderColor: '#E5D3BD', borderRadius: 80, paddingHorizontal: 24, paddingVertical: 8 },
   cooking: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   leftover: {
     flexDirection: 'row',

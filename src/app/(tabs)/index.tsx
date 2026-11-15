@@ -63,8 +63,8 @@ export default function Today() {
       <View style={styles.header}>
 
         <View style={{ flex: 1 }}>
-          <Txt variant="small" style={{ marginBottom: 8 }}>{me.tableName}</Txt>
-          <Txt variant="hero">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'},{'\n'}{me.displayName}.</Txt>
+          <Txt variant="hero">{me.tableName}</Txt>
+          <Txt style={{ color: Palette.inkSoft, marginTop: 6 }}>Lovely to see you, {me.displayName}.</Txt>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Table settings" onPress={() => setSettingsOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="settings" /></Pressable>
       </View>
@@ -101,9 +101,11 @@ export default function Today() {
         {days !== null && <Txt variant="small" testID="feast-countdown">{countdown}</Txt>}
       </View>
 
+      <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
+
       <Card style={styles.spark}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Txt variant="label">Today&apos;s spark</Txt><Txt variant="small" style={{ marginLeft: 'auto' }}>Optional</Txt></View>
-        <Txt variant="title" testID="spark-text" style={{ fontSize: 27, lineHeight: 36, paddingVertical: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Txt variant="small">A little inspiration, if you need it</Txt></View>
+        <Txt variant="title" testID="spark-text" style={{ fontSize: 22, lineHeight: 30, fontWeight: '400', paddingVertical: 4 }}>
           {spark?.text ?? 'Fold anything you like today.'}
         </Txt>
         {spark?.type === 'sealed' && <Txt variant="small" testID="spark-sealed">Sealed until the Sunday Feast.</Txt>}
@@ -136,7 +138,7 @@ export default function Today() {
 
       {date && <AskTheTable date={date} members={today.members} />}
 
-      <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
+
 
 
     </Screen>
@@ -146,7 +148,7 @@ export default function Today() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  spark: { paddingTop: 24, paddingBottom: 8, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Palette.border },
+  spark: { paddingTop: 24, paddingBottom: 0 },
   sparkActions: { flexDirection: 'row', gap: 10 },
   tableStats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   centerText: { textAlign: 'center' },

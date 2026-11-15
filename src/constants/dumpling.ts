@@ -1,11 +1,11 @@
 import { Platform } from 'react-native';
 
 export const Palette = {
-  border: '#DED8CC',
+  border: '#E9E5DF',
   night: '#1D1916',
   gold: '#D9B877',
-  cream: '#F8F5EE',
-  creamDeep: '#EEE8DC',
+  cream: '#FCFBF8',
+  creamDeep: '#F2EEE8',
   card: '#FCFAF6',
   accent: '#AD6043',
   accentDeep: '#85442D',
@@ -16,10 +16,10 @@ export const Palette = {
   danger: '#B3412E',
 } as const;
 
-export const Radius = { card: 8, button: 8, chip: 6 } as const;
+export const Radius = { card: 12, button: 12, chip: 8 } as const;
 
 export const Type = {
-  display: Platform.select({ ios: 'Georgia', default: 'serif' }),
+  display: Platform.select({ ios: 'System', default: undefined }),
   family: Platform.select({ ios: 'System', default: undefined }),
   hero: 30,
   title: 21,

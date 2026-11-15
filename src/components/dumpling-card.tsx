@@ -73,8 +73,8 @@ function AudioClip({ url }: { url: string }) {
 export function DumplingCard({ dumpling, replies }: { dumpling: RevealedDumpling; replies?: Map<string, RevealedDumpling[]> }) {
   const nested = replies?.get(dumpling.id) ?? [];
   return (
-    <Card style={{ paddingVertical: 16, gap: 12 }}>
-      <Txt style={{ paddingHorizontal: 4, fontWeight: '600' }}>
+    <Card style={{ paddingVertical: 8, gap: 10 }}>
+      <Txt style={{ paddingHorizontal: 0, fontWeight: '500' }}>
         {dumpling.memberName}
       </Txt>
       {dumpling.createdAt && <Txt variant="small" style={{ paddingHorizontal: 4 }}>{new Date(dumpling.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Txt>}
@@ -106,7 +106,7 @@ export function DumplingCard({ dumpling, replies }: { dumpling: RevealedDumpling
 }
 
 const styles = StyleSheet.create({
-  video: { width: '100%', aspectRatio: 4 / 5, borderRadius: Radius.card - 8, overflow: 'hidden', backgroundColor: Palette.ink },
+  video: { width: '100%', aspectRatio: 4 / 5, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: Palette.ink },
   audio: { aspectRatio: 3, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center', gap: 4 },
   play: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   playDisc: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(29,25,22,0.55)', alignItems: 'center', justifyContent: 'center' },

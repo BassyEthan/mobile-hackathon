@@ -44,7 +44,7 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
 
   const folded = members.filter((m) => m.folded).map((m) => (m.isMe ? 'You' : m.displayName));
   const inLine = folded.length === 0
-    ? 'The steamer is warm.'
+    ? 'A new day around your Table.'
     : `${folded.length === 1 ? folded[0] : `${folded.slice(0, -1).join(', ')} and ${folded[folded.length - 1]}`} ${folded.length === 1 && folded[0] !== 'You' ? 'is' : 'are'} in.`;
   const shown = new Set(dumplings.map((d) => d.id));
   const replies = new Map<string, RevealedDumpling[]>();
@@ -55,7 +55,7 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 12 }}>
-        <Txt variant="title">Around the Table</Txt>
+        <Txt variant="title">Little moments, together</Txt>
         <View style={styles.seats}>
           {members.map((m) => (
             <View key={m.id} style={styles.seat}>
@@ -73,11 +73,11 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
       {!lidOff ? (
         <Card style={styles.lid}>
 
-          <Txt variant="title" style={{ textAlign: 'center' }}>
-            Your day belongs here.
+          <Txt variant="title" style={{ textAlign: 'left' }}>
+            Something small from your day.
           </Txt>
-          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>
-            Share anything from your day to see your family’s moments. No spark needed.
+          <Txt style={{ textAlign: 'left', color: Palette.inkSoft }}>
+            A view from your window. Something you’re making. Share a Fold to open today’s family moments.
           </Txt>
         </Card>
       ) : (
@@ -97,5 +97,5 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center' },
   avatarFolded: { backgroundColor: Palette.inkSoft },
   initial: { fontSize: 16, fontWeight: '600', color: Palette.inkSoft },
-  lid: { alignItems: 'center', paddingVertical: 32 },
+  lid: { paddingTop: 8, paddingBottom: 0 },
 });
