@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -45,11 +45,11 @@ function HostLine({ text, audioUrl, chefName, onDone, paused }: { text: string; 
   }, [audioUrl, status.didJustFinish, onDone]);
   useTimer(audioUrl ? 20_000 : 2200 + text.length * 55, onDone, paused);
   return (
-    <View style={styles.centerStage}>
+    <ScrollView contentContainerStyle={styles.centerStage}>
       <Mascot size={100} mood="smile" />
       <Text style={styles.chef}>{chefName}</Text>
       <Text style={styles.line}>{text}</Text>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -99,7 +99,7 @@ function Card({ segment, onDone, paused }: { segment: Exclude<Segment, { type: '
   }, [segment.type]);
   if (segment.type === 'titleCard') {
     return (
-      <View style={styles.centerStage}>
+      <ScrollView contentContainerStyle={styles.centerStage}>
         <Text style={styles.kicker}>{segment.title}</Text>
         {segment.phrase ? (
           <>
@@ -110,25 +110,25 @@ function Card({ segment, onDone, paused }: { segment: Exclude<Segment, { type: '
         ) : (
           segment.subtitle && <Text style={styles.line}>{segment.subtitle}</Text>
         )}
-      </View>
+      </ScrollView>
     );
   }
   if (segment.type === 'award') {
     return (
-      <View style={styles.centerStage}>
+      <ScrollView contentContainerStyle={styles.centerStage}>
         <AwardEmblem />
         <Text style={styles.kicker}>{segment.award}</Text>
         <Text style={styles.title}>{segment.memberName}</Text>
         <Text style={styles.line}>{segment.text}</Text>
-      </View>
+      </ScrollView>
     );
   }
   return (
-    <View style={styles.centerStage}>
+    <ScrollView contentContainerStyle={styles.centerStage}>
       <Text style={styles.kicker}>Secret Ingredient</Text>
       <Text style={styles.title}>{segment.prompt}</Text>
       <Text style={styles.line}>{segment.text}</Text>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -146,16 +146,16 @@ export default function Player() {
 
   if (feast === null) {
     return (
-      <View style={[styles.root, styles.centerStage]}>
-        <Text style={styles.line}>This Feast is not on your Table.</Text>
-      </View>
+      <ScrollView style={styles.root} contentContainerStyle={styles.centerStage}>
+        <Text style={styles.line}>This Feast is not on your Table.</Text><Pressable accessibilityRole="button" accessibilityLabel="Close Feast" onPress={() => router.canGoBack() ? router.back() : router.replace('/feast')} style={styles.iconButton}><Icon name="close" color={Palette.cream} /></Pressable>
+      </ScrollView>
     );
   }
   if (!feast || !segments) {
     return (
-      <View style={[styles.root, styles.centerStage]}>
+      <ScrollView style={styles.root} contentContainerStyle={styles.centerStage}>
         <ActivityIndicator color={Palette.cream} />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -172,17 +172,17 @@ export default function Player() {
         <Text style={styles.feastTitle} numberOfLines={1}>
           {feast.title}
         </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close Feast" onPress={() => router.back()} style={styles.iconButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close Feast" onPress={() => router.canGoBack() ? router.back() : router.replace('/feast')} style={styles.iconButton}>
           <Icon name="close" color={Palette.cream} />
         </Pressable>
       </View>
       <View style={styles.stage} testID={`segment-${index}`}>
         {done ? (
-          <View style={styles.centerStage}>
+          <ScrollView contentContainerStyle={styles.centerStage}>
             <Mascot size={100} />
             <Text style={styles.title}>That&apos;s the Feast.</Text>
             <Text style={styles.line}>See you next Sunday.</Text>
-          </View>
+          </ScrollView>
         ) : segment.type === 'hostLine' ? (
           <HostLine key={index} text={segment.text} audioUrl={segment.audioUrl} chefName={feast.chefName} onDone={advance} paused={paused} />
         ) : segment.type === 'clip' ? (
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feastTitle: { flex: 1, color: Palette.creamDeep, fontSize: 13, fontWeight: '500', fontFamily: Type.family },
   stage: { flex: 1, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: '#25201C' },
-  centerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
+  centerStage: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
   chef: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },
   line: { color: Palette.cream, fontSize: 20, lineHeight: 29, textAlign: 'center', fontFamily: Type.family },
   kicker: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },

@@ -66,6 +66,7 @@ export function Button({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!(disabled || busy), busy: !!busy }}
       disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [
@@ -78,15 +79,15 @@ export function Button({
         pressed && (reduced ? { opacity: 0.75 } : styles.pressed),
       ]}>
       {busy ? (
-        <ActivityIndicator color={kind === 'primary' ? Palette.cream : Palette.ink} />
+        <ActivityIndicator color={Palette.ink} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexShrink: 1 }}>
-        {icon && <Icon name={icon} color={kind === 'primary' ? Palette.card : kind === 'quiet' ? Palette.accentDeep : Palette.ink} />}
+        {icon && <Icon name={icon} color={kind === 'quiet' ? Palette.accentDeep : Palette.ink} />}
         <Text
           style={[
             styles.text,
             big ? styles.buttonBigText : styles.buttonText,
-            kind === 'primary' && { color: Palette.cream },
+            kind === 'primary' && { color: Palette.ink },
             kind === 'quiet' && { color: Palette.accentDeep },
           ]}>
           {label}

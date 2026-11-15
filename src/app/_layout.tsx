@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { Palette } from '@/constants/dumpling';
 import { SessionProvider, useSession } from '@/lib/session';
 
@@ -16,13 +17,14 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: Palette.cream, primary: Palette.accent } };
 
 function RootStack() {
+  const reducedMotion = useReducedMotion();
   const { ready, auth } = useSession();
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
   if (!ready) return null;
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Palette.cream } }}>
+    <Stack screenOptions={{ headerShown: false, animation: reducedMotion ? 'none' : 'default', contentStyle: { backgroundColor: Palette.cream } }}>
       <Stack.Protected guard={!auth}>
         <Stack.Screen name="welcome" />
       </Stack.Protected>

@@ -153,7 +153,7 @@ export default function Fold() {
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
       <StatusBar style="light" />
       <View style={styles.top}>
-        <Button kind="quiet" icon="close" label="Close" onPress={() => router.back()} />
+        <Button kind="quiet" icon="close" label="Close" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} />
         {phase === 'recording' && <Txt variant="title" style={{ color: Palette.cream }}>{secondsLeft}s</Txt>}
         {(phase === 'ready' || phase === 'recording') && (
           <Button
