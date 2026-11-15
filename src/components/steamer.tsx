@@ -5,28 +5,30 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { DumplingCard, type RevealedDumpling } from '@/components/dumpling-card';
 import { Mascot } from '@/components/mascot';
 import { Card, Txt } from '@/components/ui';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { Palette } from '@/constants/dumpling';
 
 type Member = { id: string; displayName: string; folded: boolean; isMe: boolean };
 
 function Reveal({ index, children }: { index: number; children: React.ReactNode }) {
+  const reduced = useReducedMotion();
   const [progress] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(progress, {
       toValue: 1,
-      duration: 520,
-      delay: 140 * index,
-      easing: Easing.out(Easing.back(1.4)),
+      duration: reduced ? 0 : 260,
+      delay: reduced ? 0 : Math.min(index, 3) * 50,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
-  }, [index, progress]);
+  }, [index, progress, reduced]);
   return (
     <Animated.View
       style={{
         opacity: progress,
         transform: [
-          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
-          { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) },
+          { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.99, 1] }) },
         ],
       }}>
       {children}
@@ -53,8 +55,8 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
   const roots = dumplings.filter((d) => !d.replyTo || !shown.has(d.replyTo));
   return (
     <View style={{ gap: 14 }}>
-      <Card>
-        <Txt variant="label">The Steamer</Txt>
+      <View style={{ gap: 12 }}>
+        <Txt variant="title">Around the Table</Txt>
         <View style={styles.seats}>
           {members.map((m) => (
             <View key={m.id} style={styles.seat}>
@@ -68,15 +70,15 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
           ))}
         </View>
         <Txt testID="steamer-status">{inLine}</Txt>
-      </Card>
+      </View>
       {!lidOff ? (
         <Card style={styles.lid}>
-          <Mascot size={90} />
+          <Mascot size={56} steaming={false} />
           <Txt variant="title" style={{ textAlign: 'center' }}>
-            The lid is on
+            A little moment opens the lid
           </Txt>
           <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>
-            Fold anything today to see what everyone folded.
+            Share anything from your day to see your family’s moments. No spark needed.
           </Txt>
         </Card>
       ) : (
@@ -93,8 +95,8 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
 const styles = StyleSheet.create({
   seats: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   seat: { alignItems: 'center', width: 62, gap: 4 },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center' },
   avatarFolded: { backgroundColor: Palette.accent },
-  initial: { fontSize: 22, fontWeight: '800', color: Palette.inkSoft },
-  lid: { alignItems: 'center', paddingVertical: 28, backgroundColor: Palette.creamDeep },
+  initial: { fontSize: 16, fontWeight: '600', color: Palette.inkSoft },
+  lid: { alignItems: 'center', paddingVertical: 24, backgroundColor: Palette.card },
 });

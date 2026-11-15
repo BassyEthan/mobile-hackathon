@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { Icon, type IconName } from '@/components/icon';
 import { Palette, Radius, Type } from '@/constants/dumpling';
 
 export function Screen({ children, scroll = true, bottomInset = 0 }: { children: ReactNode; scroll?: boolean; bottomInset?: number }) {
@@ -47,7 +49,9 @@ export function Button({
   busy,
   big,
   testID,
+  icon,
 }: {
+  icon?: IconName;
   label: string;
   onPress: () => void;
   kind?: 'primary' | 'secondary' | 'quiet';
@@ -56,6 +60,7 @@ export function Button({
   big?: boolean;
   testID?: string;
 }) {
+  const reduced = useReducedMotion();
   return (
     <Pressable
       testID={testID}
@@ -70,32 +75,36 @@ export function Button({
         kind === 'secondary' && styles.secondary,
         kind === 'quiet' && styles.quiet,
         (disabled || busy) && styles.disabled,
-        pressed && styles.pressed,
+        pressed && (reduced ? { opacity: 0.75 } : styles.pressed),
       ]}>
       {busy ? (
         <ActivityIndicator color={kind === 'primary' ? Palette.cream : Palette.ink} />
       ) : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexShrink: 1 }}>
+        {icon && <Icon name={icon} color={kind === 'primary' ? Palette.card : kind === 'quiet' ? Palette.accentDeep : Palette.ink} />}
         <Text
           style={[
             styles.text,
             big ? styles.buttonBigText : styles.buttonText,
             kind === 'primary' && { color: Palette.cream },
-            kind === 'quiet' && { color: Palette.accent },
+            kind === 'quiet' && { color: Palette.accentDeep },
           ]}>
           {label}
         </Text>
+        </View>
       )}
     </Pressable>
   );
 }
 
 export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
+  const reduced = useReducedMotion();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && (reduced ? { opacity: 0.75 } : styles.pressed)]}>
       <Text style={[styles.text, styles.small, selected && { color: Palette.cream }]}>{label}</Text>
     </Pressable>
   );
@@ -103,23 +112,23 @@ export function Chip({ label, selected, onPress }: { label: string; selected?: b
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Palette.cream },
-  content: { paddingHorizontal: 22, gap: 18, flexGrow: 1 },
+  content: { paddingHorizontal: 22, gap: 24, flexGrow: 1 },
   text: { color: Palette.ink, fontFamily: Type.family },
-  hero: { fontSize: Type.hero, fontWeight: '800', lineHeight: Type.hero * 1.15 },
-  title: { fontSize: Type.title, fontWeight: '700', lineHeight: Type.title * 1.2 },
+  hero: { fontSize: Type.hero, fontWeight: '600', lineHeight: Type.hero * 1.15 },
+  title: { fontSize: Type.title, fontWeight: '600', lineHeight: Type.title * 1.2 },
   body: { fontSize: Type.body, lineHeight: Type.body * 1.35 },
   small: { fontSize: Type.small, lineHeight: Type.small * 1.35, color: Palette.inkSoft },
-  label: { fontSize: Type.small, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: Palette.accentDeep },
-  card: { backgroundColor: Palette.card, borderRadius: Radius.card, padding: 22, gap: 10, borderWidth: 1, borderColor: Palette.creamDeep },
-  button: { minHeight: 60, borderRadius: Radius.button, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  buttonBig: { minHeight: 96 },
+  label: { fontSize: Type.small, fontWeight: '600', letterSpacing: 0.2, color: Palette.accentDeep },
+  card: { backgroundColor: Palette.card, borderRadius: Radius.card, padding: 20, gap: 10, borderWidth: 1, borderColor: Palette.border },
+  button: { minHeight: 52, borderRadius: Radius.button, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  buttonBig: { minHeight: 60 },
   primary: { backgroundColor: Palette.accent },
   secondary: { backgroundColor: Palette.creamDeep },
   quiet: { backgroundColor: 'transparent' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
-  buttonText: { fontSize: 20, fontWeight: '700' },
-  buttonBigText: { fontSize: 30, fontWeight: '800' },
+  buttonText: { flexShrink: 1, textAlign: 'center', fontSize: 16, fontWeight: '600' },
+  buttonBigText: { flexShrink: 1, textAlign: 'center', fontSize: 17, fontWeight: '600' },
   chip: { minHeight: 44, paddingHorizontal: 16, borderRadius: Radius.chip, backgroundColor: Palette.creamDeep, justifyContent: 'center' },
   chipSelected: { backgroundColor: Palette.ink },
 });

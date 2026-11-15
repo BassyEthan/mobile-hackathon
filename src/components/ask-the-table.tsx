@@ -3,7 +3,8 @@ import { ConvexError } from 'convex/values';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { Button, Card, Chip, Txt } from '@/components/ui';
+import { Button, Chip, Txt } from '@/components/ui';
+import { Sheet } from '@/components/sheet';
 import { Palette, Radius, Type } from '@/constants/dumpling';
 import { useSession } from '@/lib/session';
 import { api } from '../../convex/_generated/api';
@@ -27,9 +28,6 @@ export function AskTheTable({ date, members }: { date: string; members: Member[]
   if (status.askedThisWeek) {
     return <Txt variant="small" testID="ask-sent">Your question is with the Chef this week.</Txt>;
   }
-  if (!open) {
-    return <Button testID="ask-the-table" kind="secondary" label="Ask the Table" onPress={() => setOpen(true)} />;
-  }
 
   const send = async () => {
     setBusy(true);
@@ -46,9 +44,12 @@ export function AskTheTable({ date, members }: { date: string; members: Member[]
 
   const others = members.filter((m) => !m.isMe);
   return (
-    <Card>
-      <Txt variant="label">Ask the Table</Txt>
+    <>
+    <Button testID="ask-the-table" icon="family" kind="quiet" label="Ask the Table" onPress={() => setOpen(true)} />
+    <Sheet visible={open} title="Ask the Table" onClose={() => setOpen(false)}>
+      <Txt variant="small">A little curiosity brings everyone closer. Send one question a week for a future spark.</Txt>
       <TextInput
+        accessibilityLabel="Your question"
         testID="ask-text"
         value={text}
         onChangeText={(t) => setText(t.slice(0, MAX_LENGTH))}
@@ -67,8 +68,9 @@ export function AskTheTable({ date, members }: { date: string; members: Member[]
         </View>
       )}
       {error && <Txt style={{ color: Palette.danger }}>{error}</Txt>}
-      <Button testID="ask-send" label="Send" busy={busy} disabled={text.trim().length < 3} onPress={() => void send()} />
-    </Card>
+      <Button testID="ask-send" icon="send" label="Send to the Chef" busy={busy} disabled={text.trim().length < 3} onPress={() => void send()} />
+    </Sheet>
+    </>
   );
 }
 

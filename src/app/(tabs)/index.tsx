@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { AskTheTable } from '@/components/ask-the-table';
+import { Icon } from '@/components/icon';
+import { Sheet } from '@/components/sheet';
 import { Mascot } from '@/components/mascot';
 import { Steamer } from '@/components/steamer';
 import { Button, Card, Screen, Txt } from '@/components/ui';
@@ -20,6 +22,7 @@ export default function Today() {
   const today = useQuery(api.today.get, auth && date ? { ...auth, date } : 'skip');
   const ensureFilling = useMutation(api.today.ensureFilling);
   const asked = useRef<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [sparkIndex, setSparkIndex] = useState(0);
 
   useEffect(() => {
@@ -59,16 +62,22 @@ export default function Today() {
   return (
     <Screen bottomInset={BottomTabInset}>
       <View style={styles.header}>
-        <Mascot size={72} />
+        <Mascot size={38} steaming={false} />
         <View style={{ flex: 1 }}>
-          <Txt variant="label">{me.tableName}</Txt>
-          <Txt variant="title">Hi, {me.displayName}</Txt>
+          <Txt variant="title">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}, {me.displayName}</Txt>
+          <Txt variant="small">{me.tableName}</Txt>
         </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Table settings" onPress={() => setSettingsOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="settings" /></Pressable>
       </View>
+      <Sheet visible={settingsOpen} title="Your Table" onClose={() => setSettingsOpen(false)}>
+        <Txt variant="title">{me.tableName}</Txt><Txt variant="small">Share this code with someone you want at your Table.</Txt><Txt selectable variant="hero">{me.joinCode}</Txt>
+        {canShare && <Button icon="family" kind="secondary" label="Share Table code" onPress={() => void shareCode()} />}
+      </Sheet>
 
       <Button
         testID="fold-button"
         big
+        icon="video"
         label="Fold a Dumpling"
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -94,8 +103,8 @@ export default function Today() {
       </View>
 
       <Card style={styles.spark}>
-        <Txt variant="label">Today&apos;s spark</Txt>
-        <Txt variant="hero" testID="spark-text">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="spark" size={18} color={Palette.accentDeep} /><Txt variant="label">Today&apos;s spark</Txt><Txt variant="small" style={{ marginLeft: 'auto' }}>Optional</Txt></View>
+        <Txt variant="title" testID="spark-text" style={{ lineHeight: 29, paddingVertical: 4 }}>
           {spark?.text ?? 'Fold anything you like today.'}
         </Txt>
         {spark?.type === 'sealed' && <Txt variant="small" testID="spark-sealed">Sealed until the Sunday Feast.</Txt>}
@@ -107,11 +116,13 @@ export default function Today() {
         {today.filling && spark && (
           <View style={styles.sparkActions}>
             <View style={{ flex: 1 }}>
-              <Button testID="next-spark" kind="secondary" label="Need a spark?" onPress={() => setSparkIndex((i) => (i + 1) % sparks.length)} />
+              <Button testID="next-spark" kind="quiet" icon="shuffle" label="Another idea" onPress={() => setSparkIndex((i) => (i + 1) % sparks.length)} />
             </View>
             <View style={{ flex: 1 }}>
               <Button
                 testID="fold-spark"
+                kind="secondary"
+                icon="video"
                 label="Fold this"
                 onPress={() => {
                   if (!today.filling) return;
@@ -141,7 +152,7 @@ export default function Today() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  spark: { backgroundColor: Palette.creamDeep, paddingVertical: 24 },
+  spark: { backgroundColor: Palette.card, paddingVertical: 20 },
   sparkActions: { flexDirection: 'row', gap: 10 },
   tableStats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   centerText: { textAlign: 'center' },

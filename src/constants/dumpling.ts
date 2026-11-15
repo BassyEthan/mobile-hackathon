@@ -1,26 +1,29 @@
 import { Platform } from 'react-native';
 
 export const Palette = {
-  cream: '#FFF6E9',
-  creamDeep: '#F7E6CC',
-  card: '#FFFDF8',
-  accent: '#E8743B',
-  accentDeep: '#C4562A',
-  ink: '#3B2A20',
-  inkSoft: '#7A6555',
+  border: '#EDE3D8',
+  night: '#1D1916',
+  gold: '#D9B877',
+  cream: '#FFFAF4',
+  creamDeep: '#F7F0E7',
+  card: '#FFFFFF',
+  accent: '#E8753D',
+  accentDeep: '#C85A2C',
+  ink: '#30251F',
+  inkSoft: '#82746A',
   steam: '#EADBC8',
   good: '#5B7F4A',
   danger: '#B3412E',
 } as const;
 
-export const Radius = { card: 28, button: 999, chip: 20 } as const;
+export const Radius = { card: 22, button: 16, chip: 12 } as const;
 
 export const Type = {
-  family: Platform.select({ ios: 'ui-rounded', default: undefined }),
-  hero: 34,
-  title: 26,
-  body: 19,
-  small: 15,
+  family: Platform.select({ ios: 'System', default: undefined }),
+  hero: 30,
+  title: 21,
+  body: 16,
+  small: 13,
 } as const;
 
 export const LANGUAGES: { code: string; label: string }[] = [
@@ -34,3 +37,5 @@ export const LANGUAGES: { code: string; label: string }[] = [
   { code: 'hi', label: 'हिन्दी' },
   { code: 'fr', label: 'Français' },
 ];
+
+export const Space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, hero: 40 } as const;

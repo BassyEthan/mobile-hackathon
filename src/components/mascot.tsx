@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { Palette } from '@/constants/dumpling';
 
 function Steam({ delay, x, size }: { delay: number; x: number; size: number }) {
@@ -34,9 +35,10 @@ function Steam({ delay, x, size }: { delay: number; x: number; size: number }) {
 }
 
 export function Mascot({ size = 120, steaming = true, mood = 'smile' }: { size?: number; steaming?: boolean; mood?: 'smile' | 'wow' }) {
+  const reduced = useReducedMotion();
   return (
     <View style={{ width: size, height: size * 1.05 }}>
-      {steaming && (
+      {steaming && !reduced && (
         <>
           <Steam delay={0} x={size * 0.3} size={size} />
           <Steam delay={700} x={size * 0.47} size={size} />

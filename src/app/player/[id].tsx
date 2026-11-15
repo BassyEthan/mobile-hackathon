@@ -8,6 +8,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
+import { AwardEmblem } from '@/components/award-emblem';
+import { StatusBar } from 'expo-status-bar';
 import { Mascot } from '@/components/mascot';
 import { ReactionBar } from '@/components/reactions';
 import { Palette, Radius, Type } from '@/constants/dumpling';
@@ -43,7 +46,7 @@ function HostLine({ text, audioUrl, chefName, onDone, paused }: { text: string; 
   useTimer(audioUrl ? 20_000 : 2200 + text.length * 55, onDone, paused);
   return (
     <View style={styles.centerStage}>
-      <Mascot size={150} mood="smile" />
+      <Mascot size={100} mood="smile" />
       <Text style={styles.chef}>{chefName}</Text>
       <Text style={styles.line}>{text}</Text>
     </View>
@@ -77,7 +80,7 @@ function Clip({ segment, onDone, paused }: { segment: Extract<Segment, { type: '
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
       ) : (
         <View style={styles.centerStage}>
-          <Mascot size={150} mood="wow" />
+          <Mascot size={100} mood="wow" />
         </View>
       )}
       <View style={styles.clipFooter}>
@@ -113,7 +116,7 @@ function Card({ segment, onDone, paused }: { segment: Exclude<Segment, { type: '
   if (segment.type === 'award') {
     return (
       <View style={styles.centerStage}>
-        <Text style={styles.trophy}>{segment.award === 'Golden Dumpling' ? '🏆🥟' : '🍽️'}</Text>
+        <AwardEmblem />
         <Text style={styles.kicker}>{segment.award}</Text>
         <Text style={styles.title}>{segment.memberName}</Text>
         <Text style={styles.line}>{segment.text}</Text>
@@ -159,6 +162,7 @@ export default function Player() {
   const segment = segments[Math.min(index, total - 1)];
   return (
     <View style={[styles.root, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 10 }]}>
+      <StatusBar style="light" />
       <View style={styles.progress}>
         {segments.map((s, i) => (
           <View key={i} style={[styles.dot, i < index && styles.dotDone, i === index && styles.dotNow]} />
@@ -169,13 +173,13 @@ export default function Player() {
           {feast.title}
         </Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Close Feast" onPress={() => router.back()} style={styles.iconButton}>
-          <Text style={styles.icon}>✕</Text>
+          <Icon name="close" color={Palette.cream} />
         </Pressable>
       </View>
       <View style={styles.stage} testID={`segment-${index}`}>
         {done ? (
           <View style={styles.centerStage}>
-            <Mascot size={150} />
+            <Mascot size={100} />
             <Text style={styles.title}>That&apos;s the Feast.</Text>
             <Text style={styles.line}>See you next Sunday.</Text>
           </View>
@@ -189,7 +193,7 @@ export default function Player() {
       </View>
       <View style={styles.controls}>
         <Pressable accessibilityRole="button" accessibilityLabel="Previous" onPress={() => setIndex((i) => Math.max(0, i - 1))} style={styles.iconButton}>
-          <Text style={styles.icon}>⏮</Text>
+          <Icon name="previous" color={Palette.cream} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -202,10 +206,10 @@ export default function Player() {
             } else setPaused((p) => !p);
           }}
           style={[styles.iconButton, styles.mainButton]}>
-          <Text style={[styles.icon, { color: Palette.ink }]}>{done ? '↺' : paused ? '▶︎' : '❚❚'}</Text>
+          <Icon name={done ? 'replay' : paused ? 'play' : 'pause'} color={Palette.ink} />
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Next" testID="player-next" onPress={advance} style={styles.iconButton}>
-          <Text style={styles.icon}>⏭</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Next" testID="player-next" disabled={done} onPress={advance} style={[styles.iconButton, done && { opacity: 0.3 }]}>
+          <Icon name="next" color={Palette.cream} />
         </Pressable>
       </View>
       <Text style={styles.counter} testID="segment-counter">
@@ -216,28 +220,28 @@ export default function Player() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Palette.ink, paddingHorizontal: 14, gap: 10 },
+  root: { flex: 1, backgroundColor: Palette.night, paddingHorizontal: 16, gap: 10 },
   progress: { flexDirection: 'row', gap: 4 },
-  dot: { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,246,233,0.2)' },
+  dot: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,246,233,0.2)' },
   dotDone: { backgroundColor: Palette.creamDeep },
   dotNow: { backgroundColor: Palette.accent },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  feastTitle: { flex: 1, color: Palette.creamDeep, fontSize: 17, fontWeight: '700', fontFamily: Type.family },
-  stage: { flex: 1, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: '#2A1E17' },
-  centerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 },
-  chef: { color: Palette.accent, fontSize: 18, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: Type.family },
-  line: { color: Palette.cream, fontSize: 24, lineHeight: 32, textAlign: 'center', fontFamily: Type.family },
-  kicker: { color: Palette.accent, fontSize: 18, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase', fontFamily: Type.family },
-  title: { color: Palette.cream, fontSize: 34, lineHeight: 40, fontWeight: '800', textAlign: 'center', fontFamily: Type.family },
-  phrase: { color: Palette.cream, fontSize: 40, lineHeight: 50, fontWeight: '800', textAlign: 'center' },
+  feastTitle: { flex: 1, color: Palette.creamDeep, fontSize: 13, fontWeight: '500', fontFamily: Type.family },
+  stage: { flex: 1, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: '#25201C' },
+  centerStage: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
+  chef: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },
+  line: { color: Palette.cream, fontSize: 20, lineHeight: 29, textAlign: 'center', fontFamily: Type.family },
+  kicker: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },
+  title: { color: Palette.cream, fontSize: 30, lineHeight: 37, fontWeight: '600', textAlign: 'center', fontFamily: Type.family },
+  phrase: { color: Palette.cream, fontSize: 32, lineHeight: 42, fontWeight: '600', textAlign: 'center' },
   romanization: { color: Palette.creamDeep, fontSize: 22, fontStyle: 'italic', textAlign: 'center' },
   trophy: { fontSize: 64 },
   clipFooter: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, gap: 8, backgroundColor: 'rgba(59,42,32,0.72)' },
-  member: { color: Palette.cream, fontSize: 22, fontWeight: '800', fontFamily: Type.family },
-  caption: { color: Palette.cream, fontSize: 20, lineHeight: 27, fontFamily: Type.family },
+  member: { color: Palette.cream, fontSize: 17, fontWeight: '600', fontFamily: Type.family },
+  caption: { color: Palette.cream, fontSize: 16, lineHeight: 23, fontFamily: Type.family },
   controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 28 },
-  iconButton: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,246,233,0.14)' },
-  mainButton: { width: 72, height: 72, borderRadius: 36, backgroundColor: Palette.cream },
+  iconButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  mainButton: { width: 56, height: 56, borderRadius: 28, backgroundColor: Palette.cream },
   icon: { color: Palette.cream, fontSize: 24 },
   counter: { color: Palette.creamDeep, textAlign: 'center', fontSize: 14 },
 });

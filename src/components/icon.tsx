@@ -1,0 +1,5 @@
+import { Sun, Clapperboard, Settings2, Video, Sparkles, UsersRound, Heart, Mic, CornerUpLeft, SkipForward, SkipBack, X, Play, Pause, RotateCcw, ArrowRight, ChevronRight, Shuffle, Send, LockKeyhole, Volume2, Check, Camera, Square, type LucideIcon } from 'lucide-react-native';
+import { Palette } from '@/constants/dumpling';
+const icons = { sun: Sun, feast: Clapperboard, settings: Settings2, video: Video, spark: Sparkles, family: UsersRound, heart: Heart, mic: Mic, reply: CornerUpLeft, next: SkipForward, previous: SkipBack, close: X, play: Play, pause: Pause, replay: RotateCcw, arrow: ArrowRight, chevron: ChevronRight, shuffle: Shuffle, send: Send, lock: LockKeyhole, volume: Volume2, check: Check, camera: Camera, stop: Square } satisfies Record<string, LucideIcon>;
+export type IconName = keyof typeof icons;
+export function Icon({ name, size = 22, color = Palette.ink }: { name: IconName; size?: number; color?: string }) { const Component = icons[name]; return <Component size={size} color={color} strokeWidth={1.8} />; }

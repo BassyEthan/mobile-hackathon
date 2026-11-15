@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StatusBar } from 'expo-status-bar';
 import { Mascot } from '@/components/mascot';
 import { Button, Txt } from '@/components/ui';
 import { Palette, Radius } from '@/constants/dumpling';
@@ -150,12 +151,14 @@ export default function Fold() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
+      <StatusBar style="light" />
       <View style={styles.top}>
-        <Button kind="quiet" label="Close" onPress={() => router.back()} />
+        <Button kind="quiet" icon="close" label="Close" onPress={() => router.back()} />
         {phase === 'recording' && <Txt variant="title" style={{ color: Palette.cream }}>{secondsLeft}s</Txt>}
         {(phase === 'ready' || phase === 'recording') && (
           <Button
             kind="quiet"
+            icon={mode === 'video' ? 'mic' : 'camera'}
             label={mode === 'video' ? 'Voice only' : 'Use camera'}
             disabled={phase === 'recording'}
             onPress={() => setMode(mode === 'video' ? 'audio' : 'video')}
@@ -207,19 +210,20 @@ export default function Fold() {
         <Button
           testID="record-button"
           big
-          label="Fold"
+          icon={mode === 'video' ? 'video' : 'mic'}
+          label="Record a moment"
           onPress={startRecording}
           disabled={(mode === 'video' && (needsCamera || !cameraReady))}
         />
       )}
-      {phase === 'recording' && <Button big label="Done" onPress={stopRecording} />}
+      {phase === 'recording' && <Button icon="stop" big label="Done" onPress={stopRecording} />}
       {phase === 'review' && (
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Button kind="secondary" label={retakesLeft > 0 ? 'Retake' : 'No retakes left'} disabled={retakesLeft === 0} onPress={retake} />
           </View>
           <View style={{ flex: 1.4 }}>
-            <Button testID="send-fold" label="Into the steamer" onPress={send} />
+            <Button testID="send-fold" icon="send" label="Post Fold" onPress={send} />
           </View>
         </View>
       )}
@@ -237,13 +241,13 @@ export default function Fold() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Palette.ink, paddingHorizontal: 18, gap: 12 },
+  root: { flex: 1, backgroundColor: Palette.night, paddingHorizontal: 18, gap: 12 },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   prompt: { color: Palette.cream, textAlign: 'center' },
   stage: { flex: 1, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: '#2A1E17' },
   audioStage: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   error: { color: Palette.creamDeep, textAlign: 'center' },
   row: { flexDirection: 'row', gap: 12 },
-  progressTrack: { height: 14, borderRadius: 7, backgroundColor: 'rgba(255,246,233,0.2)', overflow: 'hidden' },
+  progressTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,246,233,0.2)', overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Palette.accent },
 });

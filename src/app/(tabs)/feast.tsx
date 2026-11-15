@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from 'convex/react';
 import { router } from 'expo-router';
+import { useState } from 'react';
+import { Icon } from '@/components/icon';
+import { ConvexError } from 'convex/values';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Mascot } from '@/components/mascot';
@@ -16,6 +19,8 @@ function formatWeek(weekOf: string) {
 }
 
 export default function Feast() {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const { auth } = useSession();
   const feasts = useQuery(api.feasts.list, auth ?? 'skip');
   const cook = useMutation(api.feasts.cook);
@@ -32,22 +37,24 @@ export default function Feast() {
     );
   }
 
+  const run = async (operation: () => Promise<unknown>) => { setBusy(true); setError(null); try { await operation(); } catch (e) { setError(e instanceof ConvexError ? String(e.data) : 'The Chef could not start. Please try again.'); } finally { setBusy(false); } };
+
   const [latest, ...leftovers] = feasts;
   const cooking = feasts.some((f) => f.status === 'cooking');
 
   return (
     <Screen bottomInset={BottomTabInset}>
-      <Txt variant="label">Sunday Feast</Txt>
+      <View style={{ gap: 8 }}><Txt variant="hero">Your family, in a show.</Txt><Txt variant="small">Small moments. A week worth keeping.</Txt></View>
       {latest ? (
         <Card style={styles.hero}>
-          <Mascot size={96} steaming={latest.status !== 'failed'} mood={latest.status === 'cooking' ? 'wow' : 'smile'} />
+          <View style={styles.cover}><View style={styles.coverRing}><Mascot size={112} steaming={latest.status !== 'failed'} mood={latest.status === 'cooking' ? 'wow' : 'smile'} /></View><Txt variant="label">Sunday Feast</Txt></View>
           <Txt variant="small">Week of {formatWeek(latest.weekOf)}</Txt>
-          <Txt variant="hero" style={{ textAlign: 'center' }} testID="latest-feast-title">
+          <Txt variant="hero" style={{ textAlign: 'left', alignSelf: 'stretch' }} testID="latest-feast-title">
             {latest.title}
           </Txt>
           {latest.status === 'ready' && (
             <View style={{ alignSelf: 'stretch' }}>
-              <Button testID="play-feast" big label="Play" onPress={() => play(latest.id)} />
+              <Button testID="play-feast" icon="play" label="Play the Feast" onPress={() => play(latest.id)} />
             </View>
           )}
           {latest.status === 'cooking' && (
@@ -59,27 +66,31 @@ export default function Feast() {
           {latest.status === 'failed' && (
             <>
               <Txt style={{ color: Palette.danger, textAlign: 'center' }}>{latest.error ?? 'Something burned.'}</Txt>
-              <Button label="Try again" onPress={() => auth && void retry({ ...auth, feastId: latest.id })} />
+              <Button label="Try again" busy={busy} onPress={() => auth && void run(() => retry({ ...auth, feastId: latest.id }))} />
             </>
           )}
         </Card>
       ) : (
         <Card style={styles.hero}>
-          <Mascot size={96} />
-          <Txt variant="title">No Feast yet</Txt>
-          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Try a Pilot with Cook the Feast now, or fold through the week for Sunday.</Txt>
+          <View style={styles.cover}><Mascot size={96} /><Txt variant="label">The first of many Sundays</Txt></View>
+          <Txt variant="title">Your first Feast starts here</Txt>
+          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Fold a few moments, then let the Chef bring them together. You can try a first episode before Sunday.</Txt>
         </Card>
       )}
 
       <Button
         testID="cook-now"
-        kind="secondary"
+        kind="quiet"
+        icon="feast"
+        busy={busy}
         label={cooking ? 'Cooking…' : 'Cook the Feast now'}
         disabled={cooking}
-        onPress={() => auth && void cook({ ...auth })}
+        onPress={() => auth && void run(() => cook({ ...auth }))}
       />
 
-      {leftovers.length > 0 && <Txt variant="label">Leftovers</Txt>}
+      {error && <Txt style={{ color: Palette.danger }}>{error}</Txt>}
+      <View style={{ gap: 6 }}><Txt variant="title">Leftovers</Txt><Txt variant="small">Good moments are worth coming back to.</Txt></View>
+      {leftovers.length === 0 && <Txt variant="small">Your past episodes will find a home here.</Txt>}
       {leftovers.map((f) => (
         <Pressable
           key={f.id}
@@ -91,9 +102,7 @@ export default function Feast() {
             <Txt variant="small">Week of {formatWeek(f.weekOf)}</Txt>
             <Txt numberOfLines={2}>{f.title}</Txt>
           </View>
-          <Txt variant="title" style={{ color: Palette.accent }}>
-            {f.status === 'ready' ? '▶︎' : f.status === 'cooking' ? '…' : '!'}
-          </Txt>
+          <Icon name={f.status === 'ready' ? 'play' : 'feast'} color={Palette.accentDeep} />
         </Pressable>
       ))}
     </Screen>
@@ -102,7 +111,9 @@ export default function Feast() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hero: { alignItems: 'center', gap: 12, paddingVertical: 28 },
+  hero: { alignItems: 'flex-start', gap: 16, padding: 20 },
+  cover: { alignSelf: 'stretch', minHeight: 180, borderRadius: 16, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 },
+  coverRing: { borderWidth: 1, borderColor: '#E5D3BD', borderRadius: 80, paddingHorizontal: 24, paddingVertical: 8 },
   cooking: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   leftover: {
     flexDirection: 'row',

@@ -4,6 +4,7 @@ import { useMutation } from 'convex/react';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Palette, Radius, Type } from '@/constants/dumpling';
 import { useSession } from '@/lib/session';
 import { uploadToConvex } from '@/lib/upload';
@@ -36,7 +37,7 @@ function VoiceChip({ url, memberName }: { url: string; memberName: string }) {
         player.play();
       }}
       style={({ pressed }) => [styles.voice, pressed && { opacity: 0.7 }]}>
-      <Text style={styles.voiceText}>{status.playing ? '🔊' : '▶︎'} {memberName}</Text>
+      <Icon name={status.playing ? 'volume' : 'play'} size={16} /><Text style={styles.voiceText}>{memberName}</Text>
     </Pressable>
   );
 }
@@ -110,12 +111,12 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
   };
 
   const label = {
-    idle: '🎙 Hold to react',
+    idle: 'Hold to react',
     starting: 'Getting ready…',
-    recording: '■ Send',
+    recording: 'Send',
     holding: 'Release to send',
     sending: 'Sending…',
-    failed: '🎙 Retry',
+    failed: 'Retry',
   }[state];
   const recording = state === 'recording' || state === 'holding';
   return (
@@ -131,7 +132,7 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
       }}
       onPress={() => void (phase.current === 'recording' ? stopAndSend() : start(false))}
       style={({ pressed }) => [styles.tap, recording && styles.recording, pressed && { opacity: 0.7 }]}>
-      <Text style={[styles.tapText, recording && { color: Palette.cream }]}>{label}</Text>
+      <Icon name={recording ? 'stop' : 'mic'} size={18} color={recording ? Palette.card : Palette.inkSoft} /><Text style={[styles.tapText, recording && { color: Palette.cream }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -156,7 +157,7 @@ export function ReactionBar({ dumplingId, reactions, dark }: { dumplingId: Id<'d
                 void Haptics.selectionAsync();
                 if (auth) void tap({ ...auth, dumplingId, kind: t.kind });
               }}
-              style={({ pressed }) => [styles.tap, dark && styles.tapDark, mine && styles.mine, pressed && { transform: [{ scale: 1.08 }] }]}>
+              style={({ pressed }) => [styles.tap, dark && styles.tapDark, mine && styles.mine, pressed && { opacity: 0.7 }]}>
               <Text style={[styles.tapText, dark && !mine && { color: Palette.cream }]}>
                 {t.emoji} {count > 0 ? count : ''}
               </Text>
@@ -178,11 +179,11 @@ export function ReactionBar({ dumplingId, reactions, dark }: { dumplingId: Id<'d
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tap: { minHeight: 48, minWidth: 56, paddingHorizontal: 14, borderRadius: Radius.chip, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center' },
+  tap: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, flexDirection: 'row', gap: 6, borderRadius: Radius.chip, backgroundColor: Palette.cream, alignItems: 'center', justifyContent: 'center' },
   tapDark: { backgroundColor: 'rgba(255,246,233,0.18)' },
-  mine: { backgroundColor: Palette.accent },
+  mine: { backgroundColor: Palette.creamDeep, borderWidth: 1, borderColor: Palette.accentDeep },
   recording: { backgroundColor: Palette.danger },
-  tapText: { fontSize: 18, fontWeight: '700', color: Palette.ink, fontFamily: Type.family },
-  voice: { minHeight: 44, paddingHorizontal: 14, borderRadius: Radius.chip, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.creamDeep, justifyContent: 'center' },
-  voiceText: { fontSize: 16, color: Palette.ink, fontFamily: Type.family },
+  tapText: { fontSize: 15, fontWeight: '500', color: Palette.ink, fontFamily: Type.family },
+  voice: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: Radius.chip, backgroundColor: Palette.card, borderWidth: 1, borderColor: Palette.creamDeep, justifyContent: 'center' },
+  voiceText: { fontSize: 13, color: Palette.ink, fontFamily: Type.family },
 });

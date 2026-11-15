@@ -52,7 +52,7 @@ export default function Welcome() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <View style={styles.hero}>
-          <Mascot size={130} />
+          <Mascot size={80} />
           <Txt variant="hero" style={styles.center}>
             Dumpling
           </Txt>
@@ -66,6 +66,7 @@ export default function Welcome() {
 
         {mode === 'join' ? (
           <TextInput
+            accessibilityLabel="Six character Table code"
             testID="join-code"
             value={code}
             onChangeText={(t) => setCode(t.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6))}
@@ -77,6 +78,7 @@ export default function Welcome() {
           />
         ) : (
           <TextInput
+            accessibilityLabel="Table name"
             testID="table-name"
             value={tableName}
             onChangeText={setTableName}
@@ -86,6 +88,7 @@ export default function Welcome() {
           />
         )}
         <TextInput
+          accessibilityLabel="Your name"
           testID="display-name"
           value={name}
           onChangeText={setName}
@@ -117,7 +120,7 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   input: {
-    minHeight: 60,
+    minHeight: 54,
     borderRadius: Radius.chip,
     backgroundColor: Palette.card,
     borderWidth: 1,
@@ -127,5 +130,5 @@ const styles = StyleSheet.create({
     color: Palette.ink,
     fontFamily: Type.family,
   },
-  code: { fontSize: 28, letterSpacing: 8, fontWeight: '800', textAlign: 'center' },
+  code: { fontSize: 24, letterSpacing: 5, fontWeight: '500', textAlign: 'center' },
 });
