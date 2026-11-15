@@ -11,10 +11,12 @@
 import type * as ai from "../ai.js";
 import type * as chef from "../chef.js";
 import type * as connectionCheck from "../connectionCheck.js";
+import type * as crons from "../crons.js";
 import type * as dumplings from "../dumplings.js";
 import type * as feasts from "../feasts.js";
 import type * as lib from "../lib.js";
 import type * as reactions from "../reactions.js";
+import type * as schedule from "../schedule.js";
 import type * as seed from "../seed.js";
 import type * as tables from "../tables.js";
 import type * as today from "../today.js";
@@ -29,10 +31,12 @@ declare const fullApi: ApiFromModules<{
   ai: typeof ai;
   chef: typeof chef;
   connectionCheck: typeof connectionCheck;
+  crons: typeof crons;
   dumplings: typeof dumplings;
   feasts: typeof feasts;
   lib: typeof lib;
   reactions: typeof reactions;
+  schedule: typeof schedule;
   seed: typeof seed;
   tables: typeof tables;
   today: typeof today;

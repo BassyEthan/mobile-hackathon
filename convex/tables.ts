@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { LANGUAGES, findMember, hashToken, randomString } from "./lib";
+import { LANGUAGES, findMember, hashToken, randomString, sessionArgs } from "./lib";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const TOKEN_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -20,19 +20,19 @@ function cleanLanguage(language: string) {
 
 async function seat(ctx: MutationCtx, tableId: Id<"tables">, displayName: string, language: string, role: "host" | "member") {
   const token = randomString(40, TOKEN_ALPHABET);
-  await ctx.db.insert("members", {
+  const memberId = await ctx.db.insert("members", {
     tableId,
     displayName,
     language,
     role,
     tokenHash: await hashToken(token),
   });
-  return token;
+  return { token, memberId };
 }
 
 export const create = mutation({
   args: { tableName: v.string(), displayName: v.string(), language: v.string(), timeZone: v.string() },
-  returns: v.object({ token: v.string(), joinCode: v.string() }),
+  returns: v.object({ token: v.string(), memberId: v.id("members"), joinCode: v.string() }),
   handler: async (ctx, args) => {
     const name = cleanName(args.tableName, "Table name");
     const displayName = cleanName(args.displayName, "Your name");
@@ -53,24 +53,24 @@ export const create = mutation({
       timeZone,
       createdAt: Date.now(),
     });
-    return { token: await seat(ctx, tableId, displayName, language, "host"), joinCode };
+    return { ...(await seat(ctx, tableId, displayName, language, "host")), joinCode };
   },
 });
 
 export const join = mutation({
   args: { joinCode: v.string(), displayName: v.string(), language: v.string() },
-  returns: v.object({ token: v.string() }),
+  returns: v.object({ token: v.string(), memberId: v.id("members") }),
   handler: async (ctx, args) => {
     const joinCode = args.joinCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(joinCode)) throw new ConvexError("Join codes are six letters or numbers.");
     const table = await ctx.db.query("tables").withIndex("by_joinCode", (q) => q.eq("joinCode", joinCode)).unique();
     if (!table) throw new ConvexError("No Table has that code. Check the six characters and try again.");
-    const token = await seat(ctx, table._id, cleanName(args.displayName, "Your name"), cleanLanguage(args.language), "member");
-    return { token };
+    return await seat(ctx, table._id, cleanName(args.displayName, "Your name"), cleanLanguage(args.language), "member");
   },
 });
 
 export const me = query({
-  args: { token: v.string() },
+  args: sessionArgs,
   returns: v.union(
     v.null(),
     v.object({
@@ -84,7 +84,7 @@ export const me = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const session = await findMember(ctx, args.token);
+    const session = await findMember(ctx, args);
     if (!session) return null;
     const { member, table } = session;
     return {

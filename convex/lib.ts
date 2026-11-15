@@ -1,6 +1,9 @@
-import { ConvexError } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import { ConvexError, v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+
+export const sessionArgs = { token: v.string(), memberId: v.id("members") };
+type Session = { token: string; memberId: Id<"members"> };
 
 export const LANGUAGES = ["en", "es", "zh", "ko", "ja", "vi", "tl", "hi", "fr"];
 
@@ -49,20 +52,29 @@ export function isDate(date: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(date);
 }
 
-export async function findMember(ctx: QueryCtx, token: string) {
-  const tokenHash = await hashToken(token);
+export function weekOfFor(date: string) {
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return addDays(date, (7 - day) % 7);
+}
+
+export function localHour(ms: number, timeZone: string) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" }).format(new Date(ms)));
+}
+
+export async function findMember(ctx: QueryCtx, session: Session) {
+  const tokenHash = await hashToken(session.token);
   const member = await ctx.db
     .query("members")
     .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
     .unique();
-  if (!member) return null;
+  if (!member || member._id !== session.memberId) return null;
   const table = await ctx.db.get("tables", member.tableId);
   if (!table) return null;
   return { member, table };
 }
 
-export async function requireMember(ctx: QueryCtx, token: string) {
-  const session = await findMember(ctx, token);
+export async function requireMember(ctx: QueryCtx, args: Session) {
+  const session = await findMember(ctx, args);
   if (!session) throw new ConvexError("Your seat at this Table has expired. Join again.");
   return session;
 }

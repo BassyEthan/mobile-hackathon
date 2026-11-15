@@ -42,7 +42,7 @@ function AudioPreview({ uri }: { uri: string }) {
 
 export default function Fold() {
   const { fillingId, prompt } = useLocalSearchParams<{ fillingId: string; prompt?: string }>();
-  const { token } = useSession();
+  const { auth } = useSession();
   const insets = useSafeAreaInsets();
   const [cameraPermission, requestCamera] = useCameraPermissions();
   const [micPermission, requestMic] = useMicrophonePermissions();
@@ -124,14 +124,14 @@ export default function Fold() {
   };
 
   const send = async () => {
-    if (!take || !token || !fillingId) return;
+    if (!take || !auth || !fillingId) return;
     setPhase('uploading');
     setProgress(0);
     setError(null);
     try {
-      const url = await generateUploadUrl({ token });
+      const url = await generateUploadUrl({ ...auth });
       const storageId = await uploadToConvex(url, take.uri, take.mediaType === 'video' ? 'video/quicktime' : 'audio/mp4', setProgress);
-      await fold({ token, fillingId: fillingId as Id<'fillings'>, storageId: storageId as Id<'_storage'>, mediaType: take.mediaType });
+      await fold({ ...auth, fillingId: fillingId as Id<'fillings'>, storageId: storageId as Id<'_storage'>, mediaType: take.mediaType });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e) {

@@ -2,35 +2,52 @@ import { File, Paths } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const KEY = 'dumpling.membershipToken';
+import type { Id } from '../../convex/_generated/dataModel';
+
+export type Membership = { token: string; memberId: Id<'members'> };
+
+const KEY = 'dumpling.membership';
 
 function fallbackFile() {
-  return new File(Paths.document, 'dumpling-membership');
+  return new File(Paths.document, 'dumpling-membership.json');
 }
 
-export async function loadToken() {
-  if (Platform.OS === 'web') return globalThis.localStorage?.getItem(KEY) ?? null;
+function parse(raw: string | null | undefined): Membership | null {
+  if (!raw) return null;
   try {
-    const token = await SecureStore.getItemAsync(KEY);
-    if (token) return token;
+    const value = JSON.parse(raw) as Partial<Membership>;
+    return typeof value.token === 'string' && typeof value.memberId === 'string'
+      ? { token: value.token, memberId: value.memberId as Id<'members'> }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadMembership() {
+  if (Platform.OS === 'web') return parse(globalThis.localStorage?.getItem(KEY));
+  try {
+    const stored = parse(await SecureStore.getItemAsync(KEY));
+    if (stored) return stored;
   } catch {}
   const file = fallbackFile();
-  return file.exists ? (await file.text()) || null : null;
+  return file.exists ? parse(await file.text()) : null;
 }
 
-export async function saveToken(token: string | null) {
+export async function saveMembership(membership: Membership | null) {
+  const raw = membership ? JSON.stringify(membership) : null;
   if (Platform.OS === 'web') {
-    if (token) globalThis.localStorage?.setItem(KEY, token);
+    if (raw) globalThis.localStorage?.setItem(KEY, raw);
     else globalThis.localStorage?.removeItem(KEY);
     return;
   }
   const file = fallbackFile();
   try {
-    if (token) await SecureStore.setItemAsync(KEY, token);
+    if (raw) await SecureStore.setItemAsync(KEY, raw);
     else await SecureStore.deleteItemAsync(KEY);
     if (file.exists) file.delete();
   } catch {
-    if (token) file.write(token);
+    if (raw) file.write(raw);
     else if (file.exists) file.delete();
   }
 }

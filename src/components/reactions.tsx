@@ -42,7 +42,7 @@ function VoiceChip({ url, memberName }: { url: string; memberName: string }) {
 }
 
 function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
-  const { token } = useSession();
+  const { auth } = useSession();
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const generateUploadUrl = useMutation(api.dumplings.generateUploadUrl);
   const sendVoice = useMutation(api.reactions.voice);
@@ -55,9 +55,9 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
     try {
       await recorder.stop();
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      if (!recorder.uri || !token) throw new Error('No recording');
-      const storageId = await uploadToConvex(await generateUploadUrl({ token }), recorder.uri, 'audio/mp4', () => {});
-      await sendVoice({ token, dumplingId, storageId: storageId as Id<'_storage'> });
+      if (!recorder.uri || !auth) throw new Error('No recording');
+      const storageId = await uploadToConvex(await generateUploadUrl({ ...auth }), recorder.uri, 'audio/mp4', () => {});
+      await sendVoice({ ...auth, dumplingId, storageId: storageId as Id<'_storage'> });
       setState('idle');
     } catch {
       setState('failed');
@@ -92,7 +92,7 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
 }
 
 export function ReactionBar({ dumplingId, reactions, dark }: { dumplingId: Id<'dumplings'>; reactions: ReactionSummary; dark?: boolean }) {
-  const { token } = useSession();
+  const { auth } = useSession();
   const tap = useMutation(api.reactions.tap);
   return (
     <View style={{ gap: 10 }}>
@@ -109,7 +109,7 @@ export function ReactionBar({ dumplingId, reactions, dark }: { dumplingId: Id<'d
               accessibilityState={{ selected: mine }}
               onPress={() => {
                 void Haptics.selectionAsync();
-                if (token) void tap({ token, dumplingId, kind: t.kind });
+                if (auth) void tap({ ...auth, dumplingId, kind: t.kind });
               }}
               style={({ pressed }) => [styles.tap, dark && styles.tapDark, mine && styles.mine, pressed && { transform: [{ scale: 1.08 }] }]}>
               <Text style={[styles.tapText, dark && !mine && { color: Palette.cream }]}>

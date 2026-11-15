@@ -16,17 +16,17 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: Palette.cream, primary: Palette.accent } };
 
 function RootStack() {
-  const { ready, token } = useSession();
+  const { ready, auth } = useSession();
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
   if (!ready) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Palette.cream } }}>
-      <Stack.Protected guard={!token}>
+      <Stack.Protected guard={!auth}>
         <Stack.Screen name="welcome" />
       </Stack.Protected>
-      <Stack.Protected guard={!!token}>
+      <Stack.Protected guard={!!auth}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="fold" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="player/[id]" options={{ presentation: 'fullScreenModal' }} />

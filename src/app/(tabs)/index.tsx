@@ -13,19 +13,19 @@ import { useMe, useSession, useToday } from '@/lib/session';
 import { api } from '../../../convex/_generated/api';
 
 export default function Today() {
-  const { token } = useSession();
+  const { auth } = useSession();
   const me = useMe();
   const date = useToday(me?.timeZone);
-  const today = useQuery(api.today.get, token && date ? { token, date } : 'skip');
+  const today = useQuery(api.today.get, auth && date ? { ...auth, date } : 'skip');
   const ensureFilling = useMutation(api.today.ensureFilling);
   const asked = useRef<string | null>(null);
 
   useEffect(() => {
-    if (token && date && today && today.filling === null && asked.current !== date) {
+    if (auth && date && today && today.filling === null && asked.current !== date) {
       asked.current = date;
-      void ensureFilling({ token });
+      void ensureFilling({ ...auth });
     }
-  }, [token, date, today, ensureFilling]);
+  }, [auth, date, today, ensureFilling]);
 
   if (!me || !today) {
     return (

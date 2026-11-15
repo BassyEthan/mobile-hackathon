@@ -15,7 +15,7 @@ type Plan = { title: string; segments: Segment[]; secretIngredient: string; summ
 const TEXT_MODEL = "gpt-6.1-terra";
 const TTS_MODEL = "gpt-4o-mini-tts";
 
-function pickClips(data: Gathered) {
+export function pickClips(data: Gathered) {
   const byMember = new Map<string, Gathered["clips"]>();
   for (const clip of [...data.clips].sort((a, b) => b.reactionCount - a.reactionCount)) {
     byMember.set(clip.memberId, [...(byMember.get(clip.memberId) ?? []), clip]);
@@ -36,8 +36,7 @@ function folds(data: Gathered) {
   return counts;
 }
 
-export function templatePlan(data: Gathered): Plan {
-  const clips = pickClips(data);
+export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
   const segments: Segment[] = [
     { type: "hostLine", text: `Welcome to ${data.tableName}, where the portions are small and the stories are not.` },
   ];
@@ -77,10 +76,19 @@ export function templatePlan(data: Gathered): Plan {
 const FLAT_SEGMENT = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "text", "dumplingId", "title", "subtitle", "phrase", "romanization", "meaning", "award", "memberName", "prompt"],
+  required: ["type", "text", "translations", "dumplingId", "title", "subtitle", "phrase", "romanization", "meaning", "award", "memberName", "prompt"],
   properties: {
     type: { type: "string", enum: ["hostLine", "clip", "titleCard", "award", "secretIngredient"] },
     text: { type: ["string", "null"] },
+    translations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["language", "text"],
+        properties: { language: { type: "string" }, text: { type: "string" } },
+      },
+    },
     dumplingId: { type: ["string", "null"] },
     title: { type: ["string", "null"] },
     subtitle: { type: ["string", "null"] },
@@ -104,12 +112,17 @@ const PLAN_SCHEMA = {
   },
 };
 
-type Flat = Record<string, string | null>;
+type Flat = Record<string, string | null> & { translations?: Array<{ language: string; text: string }> };
 
-export function validatePlan(raw: unknown, data: Gathered): Plan {
+export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clips"]): Plan {
   const plan = raw as { title?: unknown; summary?: unknown; segments?: unknown };
   if (typeof plan?.title !== "string" || !Array.isArray(plan.segments)) throw new Error("Missing title or segments");
-  const clipIds = new Set<string>(data.clips.map((c) => c.id));
+  const clipIds = new Set<string>(clips.map((c) => c.id));
+  const languages = new Set(data.members.map((m) => m.language).filter((l) => l !== "en"));
+  const localized = (s: Flat) => {
+    const entries = (s.translations ?? []).filter((t) => languages.has(t.language) && t.text.trim()).map((t) => [t.language, t.text.trim()]);
+    return entries.length > 0 ? { translations: Object.fromEntries(entries) as Record<string, string> } : {};
+  };
   const memberNames = new Set(data.members.map((m) => m.name));
   const segments: Segment[] = [];
   const used = new Set<string>();
@@ -122,7 +135,7 @@ export function validatePlan(raw: unknown, data: Gathered): Plan {
     if (s.type === "hostLine") {
       const text = need("text");
       if (text.length > 220 || (text.match(/[.!?](\s|$)/g)?.length ?? 1) > 1) throw new Error("Chef lines must be one sentence");
-      segments.push({ type: "hostLine", text });
+      segments.push({ type: "hostLine", text, ...localized(s) });
     } else if (s.type === "clip") {
       const id = need("dumplingId");
       if (!clipIds.has(id)) throw new Error(`Unknown clip ${id}`);
@@ -142,18 +155,17 @@ export function validatePlan(raw: unknown, data: Gathered): Plan {
       const memberName = need("memberName");
       if (!memberNames.has(memberName)) throw new Error(`Unknown member ${memberName}`);
       const id = s.dumplingId && clipIds.has(s.dumplingId) ? (s.dumplingId as Id<"dumplings">) : undefined;
-      segments.push({ type: "award", award: need("award"), memberName, text: need("text"), ...(id ? { dumplingId: id } : {}) });
+      segments.push({ type: "award", award: need("award"), memberName, text: need("text"), ...localized(s), ...(id ? { dumplingId: id } : {}) });
     } else if (s.type === "secretIngredient") {
-      segments.push({ type: "secretIngredient", prompt: need("prompt"), text: need("text") });
+      segments.push({ type: "secretIngredient", prompt: need("prompt"), text: need("text"), ...localized(s) });
     } else {
       throw new Error(`Unknown segment type ${s.type}`);
     }
   }
-  const wantClips = Math.min(4, data.clips.length);
   if (segments[0]?.type !== "hostLine") throw new Error("Start with a hostLine cold open");
-  if (used.size < wantClips || used.size > 6) throw new Error(`Use between ${wantClips} and 6 clips`);
+  if (used.size !== clipIds.size) throw new Error(`Use every one of the ${clipIds.size} selected clips exactly once`);
   if (data.previous && !segments.some((s) => s.type === "titleCard" && s.title === "Last Week")) throw new Error("Include a Last Week titleCard");
-  if (data.clips.some((c) => c.language && c.language !== "en") && !segments.some((s) => s.type === "titleCard" && s.title === "Mother Tongue" && s.phrase && s.meaning)) {
+  if (clips.some((c) => c.language && c.language !== "en") && !segments.some((s) => s.type === "titleCard" && s.title === "Mother Tongue" && s.phrase && s.meaning)) {
     throw new Error("Include a Mother Tongue titleCard with phrase, romanization and meaning");
   }
   for (const award of ["Golden Dumpling", "Empty Plate"]) {
@@ -211,15 +223,17 @@ async function remember(tableId: string, summary: string, feastId: string) {
   } catch {}
 }
 
-async function aiPlan(data: Gathered): Promise<Plan> {
+async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
   const memories = await callbacks(data.tableId);
   const brief = {
     table: data.tableName,
     chef: data.chefName,
     members: data.members.map((m) => m.name),
+    captionLanguages: [...new Set(data.members.map((m) => m.language).filter((l) => l !== "en"))],
+    foldsThisWeek: Object.fromEntries(folds(data)),
     lastWeek: data.previous,
     callbacks: memories,
-    clips: data.clips.map((c) => ({
+    clips: clips.map((c) => ({
       dumplingId: c.id,
       member: c.memberName,
       day: c.date,
@@ -232,7 +246,7 @@ async function aiPlan(data: Gathered): Promise<Plan> {
     })),
   };
   const instructions = `You are ${data.chefName}, host of a family's Sunday show called the Feast. Write the episode as an ordered list of segments.
-Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use between ${Math.min(4, data.clips.length)} and 6 clip segments by dumplingId, each at most once, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId) and award "Empty Plate" (gentle nudge to whoever folded least). End with exactly one secretIngredient: a new Filling prompt for next week plus a one-line tease. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. Set unused fields to null. summary is two sentences for the family's memory.`;
+Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId) and award "Empty Plate" (gentle nudge to whoever folded least). End with exactly one secretIngredient: a new Filling prompt for next week plus a one-line tease. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
   let feedback = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await openai("/responses", {
@@ -242,7 +256,7 @@ Rules: start with a hostLine cold open. If lastWeek is not null, include a title
       text: { format: { type: "json_schema", name: "feast", strict: true, schema: PLAN_SCHEMA } },
     });
     try {
-      return validatePlan(JSON.parse(outputText(await response.json())), data);
+      return validatePlan(JSON.parse(outputText(await response.json())), data, clips);
     } catch (e) {
       feedback = `\n\nYour previous plan was rejected: ${e instanceof Error ? e.message : String(e)}. Fix it.`;
     }
@@ -281,7 +295,8 @@ export const cook = internalAction({
     const data = await ctx.runQuery(internal.feasts.gather, { feastId: args.feastId });
     if (!data) return null;
     try {
-      const plan = process.env.OPENAI_API_KEY ? await aiPlan(data) : templatePlan(data);
+      const clips = pickClips(data);
+      const plan = process.env.OPENAI_API_KEY ? await aiPlan(data, clips) : templatePlan(data, clips);
       const segments = process.env.OPENAI_API_KEY ? await voiceLines(ctx, plan.segments) : plan.segments;
       await ctx.runMutation(internal.feasts.finish, { feastId: args.feastId, title: plan.title, segments, secretIngredient: plan.secretIngredient });
       await remember(data.tableId, plan.summary, args.feastId);
