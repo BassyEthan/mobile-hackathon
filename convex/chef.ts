@@ -196,18 +196,32 @@ export function outputText(data: { output?: Array<{ type: string; content?: Arra
     .join("");
 }
 
+function memoryEndpoint(tableId: string, operation: "search" | "document") {
+  return `https://api.supermemory.ai/ns/${encodeURIComponent(`dumpling_${tableId}`)}/${operation}`;
+}
+
 async function callbacks(tableId: string) {
   if (!process.env.SUPERMEMORY_API_KEY) return [];
   try {
-    const response = await fetch("https://api.supermemory.ai/v4/search", {
+    const response = await fetch(memoryEndpoint(tableId, "search"), {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.SUPERMEMORY_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ q: "running jokes, recurring moments and callbacks from past Feasts", containerTag: `dumpling_${tableId}`, limit: 5 }),
+      body: JSON.stringify({
+        query: "Memorable family moments, dishes, running jokes, and callbacks from previous Sunday Feasts",
+        searchMode: "hybrid",
+        limit: 5,
+      }),
     });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.warn(`Supermemory Feast search failed with status ${response.status}`);
+      return [];
+    }
     const data = (await response.json()) as { results?: Array<{ memory?: string; chunk?: string }> };
-    return (data.results ?? []).map((r) => r.memory ?? r.chunk ?? "").filter(Boolean).slice(0, 5);
+    const matches = (data.results ?? []).map((r) => r.memory || r.chunk || "").filter(Boolean).slice(0, 5);
+    console.info(`Supermemory Feast search retrieved ${matches.length} callbacks`);
+    return matches;
   } catch {
+    console.warn("Supermemory Feast search failed");
     return [];
   }
 }
@@ -215,12 +229,15 @@ async function callbacks(tableId: string) {
 async function remember(tableId: string, summary: string, feastId: string) {
   if (!process.env.SUPERMEMORY_API_KEY) return;
   try {
-    await fetch("https://api.supermemory.ai/v3/documents", {
+    const response = await fetch(memoryEndpoint(tableId, "document"), {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.SUPERMEMORY_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ content: summary, containerTag: `dumpling_${tableId}`, customId: `feast_${feastId}` }),
+      body: JSON.stringify({ content: summary, id: `feast_${feastId}` }),
     });
-  } catch {}
+    if (!response.ok) console.warn(`Supermemory Feast save failed with status ${response.status}`);
+  } catch {
+    console.warn("Supermemory Feast save failed");
+  }
 }
 
 async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
