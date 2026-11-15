@@ -2,8 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { ensureFillingFor } from "./schedule";
-import { canSeeDumpling, dateInZone, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, weekOfFor } from "./lib";
+import { ensureFillingFor, markToday } from "./schedule";
+import { canSeeDumpling, currentDay, dateInZone, fillingHiddenFrom, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, weekOfFor } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -78,7 +78,9 @@ export const get = query({
         id: v.id("fillings"),
         date: v.string(),
         prompt: v.string(),
-        sparks: v.array(v.object({ key: v.string(), text: v.string() })),
+        sparks: v.array(v.object({ key: v.string(), english: v.string(), text: v.string(), type: v.string() })),
+        authorName: v.union(v.string(), v.null()),
+        addressedToName: v.union(v.string(), v.null()),
       }),
     ),
     members: v.array(v.object({ id: v.id("members"), displayName: v.string(), folded: v.boolean(), isMe: v.boolean() })),
@@ -90,16 +92,23 @@ export const get = query({
     const { member, table } = await requireMember(ctx, args);
     const date = isDate(args.date) ? args.date : dateInZone(table.createdAt, table.timeZone);
     const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
-    const filling = await ctx.db
-      .query("fillings")
-      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
-      .unique();
+    const today = await currentDay(ctx, table);
+    const found = today !== null && date <= today
+      ? await ctx.db
+          .query("fillings")
+          .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
+          .unique()
+      : null;
+    const filling = found && !fillingHiddenFrom(found, member._id) ? found : null;
     const todays = await ctx.db
       .query("dumplings")
       .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
       .take(200);
-    const folded = new Set(todays.map((d) => d.memberId));
+    const folded = new Set(
+      todays.filter((d) => d.memberId === member._id || (!d.sealed && !d.hiddenFrom?.includes(member._id))).map((d) => d.memberId),
+    );
     const lidOff = folded.has(member._id) || !(await isDayOpen(ctx, table, date));
+    const nameOf = (id: Doc<"members">["_id"] | undefined) => (id ? (members.find((m) => m._id === id)?.displayName ?? null) : null);
     const dumplings = [];
     if (lidOff) {
       for (const dumpling of todays.sort((a, b) => a.createdAt - b.createdAt)) {
@@ -107,7 +116,16 @@ export const get = query({
       }
     }
     return {
-      filling: filling ? { id: filling._id, date: filling.date, prompt: filling.prompt, sparks: sparksFor(filling) } : null,
+      filling: filling
+        ? {
+            id: filling._id,
+            date: filling.date,
+            prompt: filling.text ?? filling.prompt,
+            sparks: sparksFor(filling, member.language),
+            authorName: nameOf(filling.authorId),
+            addressedToName: nameOf(filling.addressedTo),
+          }
+        : null,
       members: members.map((m) => ({
         id: m._id,
         displayName: m.displayName,
@@ -126,6 +144,6 @@ export const ensureFilling = mutation({
   returns: v.id("fillings"),
   handler: async (ctx, args) => {
     const { table } = await requireMember(ctx, args);
-    return await ensureFillingFor(ctx, table, dateInZone(Date.now(), table.timeZone));
+    return await ensureFillingFor(ctx, table, await markToday(ctx, table, Date.now()));
   },
 });

@@ -50,7 +50,8 @@
     "lint": "expo lint",
     "dev": "convex dev",
     "seed": "node scripts/seed-demo.mjs",
-    "smoke": "node --env-file=.env.local scripts/smoke-two-members.mjs"
+    "smoke": "node --env-file=.env.local scripts/smoke-two-members.mjs",
+    "smoke:sparks": "node --env-file=.env.local scripts/smoke-sparks.mjs"
   },
   "private": true
 }

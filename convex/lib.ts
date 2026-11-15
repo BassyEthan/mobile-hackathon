@@ -7,21 +7,6 @@ type Session = { token: string; memberId: Id<"members"> };
 
 export const LANGUAGES = ["en", "es", "zh", "ko", "ja", "vi", "tl", "hi", "fr"];
 
-export const FILLING_PROMPTS = [
-  "What did you eat today that made you smile?",
-  "Show us the view from where you are right now.",
-  "Teach us one word from your day.",
-  "What is something small that went right?",
-  "Who did you talk to today, and what did they say?",
-  "Show us something you made with your hands.",
-  "What is a sound you heard today?",
-  "What would you cook for the whole table tonight?",
-  "Show us your shoes and where they took you.",
-  "What made you laugh this week?",
-  "What is one thing you want the family to know?",
-  "Show us the messiest corner of your day.",
-];
-
 export async function hashToken(token: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -79,27 +64,30 @@ export async function requireMember(ctx: QueryCtx, args: Session) {
   return session;
 }
 
-export const SAFE_SPARKS: Array<{ text: string; type: string }> = [
-  { text: "What did you eat today that made you smile?", type: "food" },
-  { text: "Show us the view from where you are right now.", type: "show" },
-  { text: "Teach us one word from your day.", type: "teach" },
-  { text: "What is something small that went right?", type: "gratitude" },
-  { text: "Who did you talk to today, and what did they say?", type: "story" },
-  { text: "Show us something you made with your hands.", type: "show" },
-  { text: "What is a sound you heard today?", type: "senses" },
-  { text: "What would you cook for the whole table tonight?", type: "food" },
-  { text: "Show us your shoes and where they took you.", type: "show" },
-  { text: "What made you laugh this week?", type: "story" },
-  { text: "Show us the oldest thing in your kitchen.", type: "memory" },
-  { text: "Hum a song that has been stuck in your head.", type: "play" },
-  { text: "What did your hands do today?", type: "senses" },
-  { text: "Show us the last thing that made you say wow.", type: "show" },
-  { text: "Tell us about a meal you still think about.", type: "memory" },
-  { text: "What is the best thing on your table right now?", type: "food" },
-  { text: "Show us your favorite cup and tell us why.", type: "show" },
-  { text: "What is one thing you learned this week?", type: "teach" },
-  { text: "Who would you call right now if you could?", type: "gratitude" },
-  { text: "Rate today's weather like a food critic.", type: "play" },
+export const SPARK_TYPES = ["show", "tell", "ask", "together", "sealed"] as const;
+export type SparkType = (typeof SPARK_TYPES)[number];
+
+export const SAFE_SPARKS: Array<{ text: string; type: SparkType }> = [
+  { text: "Show us your hands doing something right now.", type: "show" },
+  { text: "Show us the oldest thing within reach.", type: "show" },
+  { text: "Show us what's outside your window.", type: "show" },
+  { text: "Show us the last thing you cooked or ate.", type: "show" },
+  { text: "Show us something sitting on your kitchen counter.", type: "show" },
+  { text: "Show us the chair you sit in most.", type: "show" },
+  { text: "Show us something small you fixed or made.", type: "show" },
+  { text: "Show us the plant or tree nearest to you.", type: "show" },
+  { text: "Tell us one sound you can hear right now.", type: "tell" },
+  { text: "Tell us what breakfast looked like when you were ten.", type: "tell" },
+  { text: "Say a word your grandparents used at dinner.", type: "tell" },
+  { text: "Tell us the name of a street you grew up on.", type: "tell" },
+  { text: "Tell us what's in your pocket or bag right now.", type: "tell" },
+  { text: "Read us one line from something near you.", type: "tell" },
+  { text: "Everyone, say good morning the way your family says it.", type: "together" },
+  { text: "Everyone, show us the cup closest to you.", type: "together" },
+  { text: "Everyone, tap a little rhythm on the nearest table.", type: "together" },
+  { text: "Everyone, show us the shoes by your door.", type: "together" },
+  { text: "Whisper one small wish for next week. We open it Sunday.", type: "sealed" },
+  { text: "Say hello to whoever watches this at Sunday's Feast.", type: "sealed" },
 ];
 
 export function seatLine(name: string) {
@@ -108,19 +96,56 @@ export function seatLine(name: string) {
 
 export const SPARK_KEYS = ["primary", "alt0", "alt1", "alt2"] as const;
 
-export function sparksFor(filling: Doc<"fillings">) {
-  const seed = Number(filling.date.replaceAll("-", ""));
-  const pool = SAFE_SPARKS.filter((s) => s.text !== filling.prompt);
-  const alternates: string[] = [];
-  for (let i = 0; alternates.length < 3; i++) alternates.push(pool[(seed + i * 7) % pool.length].text);
-  return [filling.prompt, ...alternates].map((text, i) => ({ key: SPARK_KEYS[i], text }));
+export type Spark = { text: string; type: SparkType; translations?: Record<string, string> };
+
+function hashDate(date: string) {
+  return Number(date.replaceAll("-", ""));
+}
+
+export function fallbackAlternates(date: string, exclude: Set<string>, primaryType?: string): Spark[] {
+  const alternates: Spark[] = [];
+  for (const type of ["show", "tell", "together", "sealed"] as const) {
+    if (alternates.length === 3 || type === primaryType) continue;
+    const pool = SAFE_SPARKS.filter((s) => s.type === type && !exclude.has(s.text));
+    if (pool.length > 0) alternates.push(pool[hashDate(date) % pool.length]);
+  }
+  return alternates;
+}
+
+export function fallbackFilling(date: string, recent: Array<{ text: string; type?: string }>) {
+  const used = new Set(recent.map((f) => f.text));
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  const wanted: SparkType[] = day === 5 ? ["sealed"] : day === 6 || day === 0 ? ["tell", "together"] : ["show", "tell"];
+  const yesterday = recent[0]?.type;
+  const types = wanted.filter((t) => t !== yesterday);
+  const candidates = SAFE_SPARKS.filter((s) => (types.length > 0 ? types : ["show", "tell", "together"]).includes(s.type) && s.type !== yesterday);
+  const fresh = candidates.filter((s) => !used.has(s.text));
+  const pool = fresh.length > 0 ? fresh : candidates;
+  const primary = pool[hashDate(date) % pool.length];
+  return { primary, moreSparks: fallbackAlternates(date, new Set([...used, primary.text]), primary.type) };
+}
+
+export function sparksFor(filling: Doc<"fillings">, language: string) {
+  const text = filling.text ?? filling.prompt;
+  const primary: Spark = { text, type: (filling.type as SparkType | undefined) ?? "tell", translations: filling.translations };
+  const alternates = filling.moreSparks ?? fallbackAlternates(filling.date, new Set([text]), undefined).filter((s) => s.type !== "sealed");
+  return [primary, ...alternates.slice(0, 3)].map((s, i) => ({
+    key: SPARK_KEYS[i],
+    english: s.text,
+    text: s.translations?.[language] ?? s.text,
+    type: s.type,
+  }));
+}
+
+export function fillingHiddenFrom(filling: Doc<"fillings">, memberId: Id<"members">) {
+  return filling.hiddenFrom?.includes(memberId) ?? false;
 }
 
 export async function currentDay(ctx: QueryCtx, table: Doc<"tables">) {
   if (table.today) return table.today;
   const latest = await ctx.db
-    .query("fillings")
-    .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id))
+    .query("dumplings")
+    .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gt("date", ""))
     .order("desc")
     .first();
   return latest?.date ?? null;
@@ -152,8 +177,7 @@ export async function canSeeDumpling(
   options: { inFeast?: boolean; depth?: number } = {},
 ): Promise<boolean> {
   if (dumpling.tableId !== member.tableId) return false;
-  if (dumpling.hiddenFrom?.includes(member._id)) return false;
-  if (dumpling.sealed && !options.inFeast) return false;
+  if (!options.inFeast && (dumpling.sealed || dumpling.hiddenFrom?.includes(member._id))) return false;
   if (dumpling.replyTo) {
     const depth = options.depth ?? 0;
     const parent = await ctx.db.get("dumplings", dumpling.replyTo);

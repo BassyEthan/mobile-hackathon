@@ -61,6 +61,26 @@ export default defineSchema({
     tableId: v.id("tables"),
     date: v.string(),
     prompt: v.string(),
+    text: v.optional(v.string()),
+    type: v.optional(v.union(v.literal("show"), v.literal("tell"), v.literal("ask"), v.literal("together"), v.literal("sealed"))),
+    authorId: v.optional(v.id("members")),
+    addressedTo: v.optional(v.id("members")),
+    hiddenFrom: v.optional(v.array(v.id("members"))),
+    translations: v.optional(v.record(v.string(), v.string())),
+    spokenVersion: v.optional(v.string()),
+    moreSparks: v.optional(
+      v.array(
+        v.object({
+          text: v.string(),
+          type: v.union(v.literal("show"), v.literal("tell"), v.literal("together"), v.literal("sealed")),
+          translations: v.optional(v.record(v.string(), v.string())),
+        }),
+      ),
+    ),
+    reason: v.optional(v.string()),
+    segmentIdea: v.optional(v.object({ memberId: v.id("members"), title: v.string() })),
+    askId: v.optional(v.id("askQueue")),
+    source: v.optional(v.union(v.literal("ai"), v.literal("fallback"), v.literal("secretIngredient"))),
   }).index("by_tableId_and_date", ["tableId", "date"]),
   dumplings: defineTable({
     tableId: v.id("tables"),

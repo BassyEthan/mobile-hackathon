@@ -19,6 +19,7 @@ import type * as lib from "../lib.js";
 import type * as reactions from "../reactions.js";
 import type * as schedule from "../schedule.js";
 import type * as seed from "../seed.js";
+import type * as sparks from "../sparks.js";
 import type * as tables from "../tables.js";
 import type * as today from "../today.js";
 
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   reactions: typeof reactions;
   schedule: typeof schedule;
   seed: typeof seed;
+  sparks: typeof sparks;
   tables: typeof tables;
   today: typeof today;
 }>;

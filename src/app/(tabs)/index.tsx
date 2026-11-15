@@ -94,8 +94,14 @@ export default function Today() {
       <Card style={styles.spark}>
         <Txt variant="label">Today&apos;s spark</Txt>
         <Txt variant="hero" testID="spark-text">
-          {spark?.text ?? 'Rolling out the dough…'}
+          {spark?.text ?? 'Fold anything you like today.'}
         </Txt>
+        {spark?.type === 'sealed' && <Txt variant="small" testID="spark-sealed">Sealed until the Sunday Feast.</Txt>}
+        {spark?.key === 'primary' && today.filling?.authorName && (
+          <Txt variant="small" testID="spark-author">
+            Asked by {today.filling.authorName}{today.filling.addressedToName ? ` for ${today.filling.addressedToName}` : ''}
+          </Txt>
+        )}
         {today.filling && spark && (
           <View style={styles.sparkActions}>
             <View style={{ flex: 1 }}>
