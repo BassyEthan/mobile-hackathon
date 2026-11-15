@@ -56,7 +56,7 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
     url: await ctx.storage.getUrl(dumpling.mediaStorageId),
     caption: dumpling.translation?.[viewer.language] ?? dumpling.transcript ?? null,
     createdAt: dumpling.createdAt,
-    spark: dumpling.sparkText ?? null,
+    spark: dumpling.hiddenFrom?.includes(viewer._id) ? null : (dumpling.sparkText ?? null),
     replyTo: parent?._id ?? null,
     replyToName: parent ? (parentAuthor?.displayName ?? "Someone") : null,
     reactions: { counts, mine, voices },

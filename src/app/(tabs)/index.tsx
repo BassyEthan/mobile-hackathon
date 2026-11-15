@@ -2,7 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Share, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { AskTheTable } from '@/components/ask-the-table';
 import { Mascot } from '@/components/mascot';
@@ -87,7 +87,9 @@ export default function Today() {
       )}
 
       <View style={styles.tableStats}>
-        <Txt variant="small" testID="table-week">Table week {today.week}</Txt>
+        <Pressable onLongPress={() => router.push('/convex-check')}>
+          <Txt variant="small" testID="table-week">Table week {today.week}</Txt>
+        </Pressable>
         {days !== null && <Txt variant="small" testID="feast-countdown">{countdown}</Txt>}
       </View>
 

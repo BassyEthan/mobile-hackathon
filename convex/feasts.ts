@@ -169,7 +169,7 @@ export const gather = internalQuery({
         memberId: d.memberId,
         memberName: names.get(d.memberId) ?? "Someone",
         date: d.date,
-        prompt: d.sparkText ?? filling?.prompt ?? null,
+        prompt: d.hiddenFrom?.length ? null : (d.sparkText ?? filling?.prompt ?? null),
         sparkId: d.fillingId && d.answeredSpark !== false ? `${d.fillingId}:${d.sparkKey ?? "primary"}` : null,
         sealed: d.sealed ?? false,
         mediaType: d.mediaType,

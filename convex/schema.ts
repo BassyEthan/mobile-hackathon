@@ -54,6 +54,8 @@ export default defineSchema({
     language: v.string(),
     role: v.union(v.literal("host"), v.literal("member")),
     tokenHash: v.string(),
+    birthday: v.optional(v.object({ month: v.number(), day: v.number() })),
+    isElder: v.optional(v.boolean()),
   })
     .index("by_tableId", ["tableId"])
     .index("by_tokenHash", ["tokenHash"]),

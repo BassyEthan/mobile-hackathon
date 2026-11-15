@@ -1,5 +1,6 @@
 import { useAction, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
+import { router } from 'expo-router';
 import type { FunctionReturnType } from 'convex/server';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -7,10 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/lib/session';
-import { api } from '../../../convex/_generated/api';
+import { api } from '../../convex/_generated/api';
 
 export default function ConvexCheckScreen() {
   const insets = useSafeAreaInsets();
@@ -52,8 +53,11 @@ export default function ConvexCheckScreen() {
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={[
         styles.container,
-        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
+        { paddingTop: insets.top + Spacing.four, paddingBottom: insets.bottom + Spacing.four },
       ]}>
+      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+        <ThemedText type="link">Back to Today</ThemedText>
+      </Pressable>
       <ThemedText type="subtitle">Convex connection check</ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
         {process.env.EXPO_PUBLIC_CONVEX_URL}
