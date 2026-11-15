@@ -9,6 +9,10 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="sun.max.fill" md="wb_sunny" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="feast">
+        <NativeTabs.Trigger.Label>Feast</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="play.tv.fill" md="live_tv" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="convex-check">
         <NativeTabs.Trigger.Label>Convex</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="bolt.horizontal.circle" md="sync" />

@@ -8,8 +8,11 @@
  * @module
  */
 
+import type * as ai from "../ai.js";
+import type * as chef from "../chef.js";
 import type * as connectionCheck from "../connectionCheck.js";
 import type * as dumplings from "../dumplings.js";
+import type * as feasts from "../feasts.js";
 import type * as lib from "../lib.js";
 import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
@@ -23,8 +26,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  ai: typeof ai;
+  chef: typeof chef;
   connectionCheck: typeof connectionCheck;
   dumplings: typeof dumplings;
+  feasts: typeof feasts;
   lib: typeof lib;
   reactions: typeof reactions;
   seed: typeof seed;

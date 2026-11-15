@@ -1,4 +1,5 @@
 import { ConvexError, v } from "convex/values";
+import { internal } from "./_generated/api";
 import { mutation } from "./_generated/server";
 import { isFillingOpen, requireMember } from "./lib";
 
@@ -37,7 +38,7 @@ export const fold = mutation({
       await ctx.storage.delete(args.storageId);
       throw new ConvexError("That clip is too large.");
     }
-    return await ctx.db.insert("dumplings", {
+    const dumplingId = await ctx.db.insert("dumplings", {
       tableId: member.tableId,
       memberId: member._id,
       fillingId: filling._id,
@@ -45,5 +46,7 @@ export const fold = mutation({
       mediaType: args.mediaType,
       createdAt: Date.now(),
     });
+    await ctx.scheduler.runAfter(0, internal.ai.processDumpling, { dumplingId });
+    return dumplingId;
   },
 });
