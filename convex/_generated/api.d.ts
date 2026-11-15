@@ -9,6 +9,10 @@
  */
 
 import type * as connectionCheck from "../connectionCheck.js";
+import type * as lib from "../lib.js";
+import type * as seed from "../seed.js";
+import type * as tables from "../tables.js";
+import type * as today from "../today.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +22,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   connectionCheck: typeof connectionCheck;
+  lib: typeof lib;
+  seed: typeof seed;
+  tables: typeof tables;
+  today: typeof today;
 }>;
 
 /**
