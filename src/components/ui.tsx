@@ -82,12 +82,12 @@ export function Button({
         <ActivityIndicator color={Palette.ink} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexShrink: 1 }}>
-        {icon && <Icon name={icon} color={kind === 'quiet' ? Palette.accentDeep : Palette.ink} />}
+        {icon && <Icon name={icon} color={kind === 'primary' ? Palette.card : kind === 'quiet' ? Palette.accentDeep : Palette.ink} />}
         <Text
           style={[
             styles.text,
             big ? styles.buttonBigText : styles.buttonText,
-            kind === 'primary' && { color: Palette.ink },
+            kind === 'primary' && { color: Palette.card },
             kind === 'quiet' && { color: Palette.accentDeep },
           ]}>
           {label}
@@ -115,16 +115,16 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Palette.cream },
   content: { paddingHorizontal: 22, gap: 24, flexGrow: 1 },
   text: { color: Palette.ink, fontFamily: Type.family },
-  hero: { fontSize: Type.hero, fontWeight: '600', lineHeight: Type.hero * 1.15 },
-  title: { fontSize: Type.title, fontWeight: '600', lineHeight: Type.title * 1.2 },
+  hero: { fontFamily: Type.display, fontSize: 34, fontWeight: '400', lineHeight: Type.hero * 1.15 },
+  title: { fontFamily: Type.display, fontSize: 24, fontWeight: '400', lineHeight: Type.title * 1.2 },
   body: { fontSize: Type.body, lineHeight: Type.body * 1.35 },
   small: { fontSize: Type.small, lineHeight: Type.small * 1.35, color: Palette.inkSoft },
-  label: { fontSize: Type.small, fontWeight: '600', letterSpacing: 0.2, color: Palette.accentDeep },
-  card: { backgroundColor: Palette.card, borderRadius: Radius.card, padding: 20, gap: 10, borderWidth: 1, borderColor: Palette.border },
+  label: { fontSize: 13, fontWeight: '500', letterSpacing: 0.3, color: Palette.inkSoft },
+  card: { paddingVertical: 20, gap: 12, borderBottomWidth: 1, borderColor: Palette.border },
   button: { minHeight: 52, borderRadius: Radius.button, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   buttonBig: { minHeight: 60 },
   primary: { backgroundColor: Palette.accent },
-  secondary: { backgroundColor: Palette.creamDeep },
+  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Palette.border },
   quiet: { backgroundColor: 'transparent' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },

@@ -11,9 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { AwardEmblem } from '@/components/award-emblem';
 import { StatusBar } from 'expo-status-bar';
-import { Mascot } from '@/components/mascot';
 import { ReactionBar } from '@/components/reactions';
-import { Palette, Radius, Type } from '@/constants/dumpling';
+import { Palette, Type } from '@/constants/dumpling';
 import { useSession } from '@/lib/session';
 import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
@@ -46,7 +45,7 @@ function HostLine({ text, audioUrl, chefName, onDone, paused }: { text: string; 
   useTimer(audioUrl ? 20_000 : 2200 + text.length * 55, onDone, paused);
   return (
     <ScrollView contentContainerStyle={styles.centerStage}>
-      <Mascot size={100} mood="smile" />
+      <View style={{ width: 32, height: 1, backgroundColor: Palette.gold, marginBottom: 16 }} />
       <Text style={styles.chef}>{chefName}</Text>
       <Text style={styles.line}>{text}</Text>
     </ScrollView>
@@ -80,7 +79,7 @@ function Clip({ segment, onDone, paused }: { segment: Extract<Segment, { type: '
         <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
       ) : (
         <View style={styles.centerStage}>
-          <Mascot size={100} mood="wow" />
+          <Icon name="volume" size={32} color={Palette.creamDeep} />
         </View>
       )}
       <View style={styles.clipFooter}>
@@ -179,8 +178,8 @@ export default function Player() {
       <View style={styles.stage} testID={`segment-${index}`}>
         {done ? (
           <ScrollView contentContainerStyle={styles.centerStage}>
-            <Mascot size={100} />
-            <Text style={styles.title}>That&apos;s the Feast.</Text>
+            <View style={{ width: 32, height: 1, backgroundColor: Palette.gold }} />
+            <Text style={styles.title}>A week to keep.</Text>
             <Text style={styles.line}>See you next Sunday.</Text>
           </ScrollView>
         ) : segment.type === 'hostLine' ? (
@@ -227,12 +226,12 @@ const styles = StyleSheet.create({
   dotNow: { backgroundColor: Palette.accent },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   feastTitle: { flex: 1, color: Palette.creamDeep, fontSize: 13, fontWeight: '500', fontFamily: Type.family },
-  stage: { flex: 1, borderRadius: Radius.card, overflow: 'hidden', backgroundColor: '#25201C' },
+  stage: { flex: 1, borderRadius: 4, overflow: 'hidden', backgroundColor: '#25201C' },
   centerStage: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
   chef: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },
   line: { color: Palette.cream, fontSize: 20, lineHeight: 29, textAlign: 'center', fontFamily: Type.family },
   kicker: { color: Palette.accent, fontSize: 14, fontWeight: '500', fontFamily: Type.family },
-  title: { color: Palette.cream, fontSize: 30, lineHeight: 37, fontWeight: '600', textAlign: 'center', fontFamily: Type.family },
+  title: { color: Palette.cream, fontSize: 32, lineHeight: 40, fontWeight: '400', textAlign: 'center', fontFamily: Type.display },
   phrase: { color: Palette.cream, fontSize: 32, lineHeight: 42, fontWeight: '600', textAlign: 'center' },
   romanization: { color: Palette.creamDeep, fontSize: 22, fontStyle: 'italic', textAlign: 'center' },
   trophy: { fontSize: 64 },

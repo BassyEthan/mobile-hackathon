@@ -17,4 +17,4 @@ export function Sheet({ visible, title, onClose, children }: { visible: boolean;
     </KeyboardAvoidingView>
   </Modal>;
 }
-const styles = StyleSheet.create({ overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(29,25,22,0.45)' }, sheet: { backgroundColor: Palette.cream, padding: 24, borderTopLeftRadius: 28, borderTopRightRadius: 28 }, header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 }, close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' } });
+const styles = StyleSheet.create({ overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(29,25,22,0.45)' }, sheet: { backgroundColor: Palette.cream, padding: 24, borderTopLeftRadius: 12, borderTopRightRadius: 12 }, header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 }, close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' } });

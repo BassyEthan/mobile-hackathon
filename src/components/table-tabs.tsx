@@ -18,4 +18,4 @@ export default function AppTabs() {
     <TabTrigger name="feast" href="/feast" asChild><TabButton icon="feast">Feast</TabButton></TabTrigger>
   </View></TabList></Tabs>;
 }
-const styles = StyleSheet.create({ bar: { flexDirection: 'row', paddingTop: 8, borderTopWidth: 1, borderColor: Palette.border, backgroundColor: Palette.cream }, button: { flex: 1, minHeight: 52, alignItems: 'center', gap: 2 }, icon: { paddingHorizontal: 18, paddingVertical: 4, borderRadius: 12 }, active: { backgroundColor: Palette.creamDeep }, label: { fontSize: 12, fontWeight: '600', color: Palette.inkSoft } });
+const styles = StyleSheet.create({ bar: { flexDirection: 'row', paddingTop: 8, borderTopWidth: 1, borderColor: Palette.border, backgroundColor: Palette.cream }, button: { flex: 1, minHeight: 52, alignItems: 'center', gap: 2 }, icon: { paddingHorizontal: 18, paddingVertical: 4, borderRadius: 12 }, active: { backgroundColor: 'transparent' }, label: { fontSize: 12, fontWeight: '600', color: Palette.inkSoft } });

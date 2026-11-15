@@ -52,7 +52,7 @@ export default function Welcome() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <View style={styles.hero}>
-          <Mascot size={80} />
+          <Mascot size={40} />
           <Txt variant="hero" style={styles.center}>
             Dumpling
           </Txt>

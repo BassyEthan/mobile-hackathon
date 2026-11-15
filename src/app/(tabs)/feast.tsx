@@ -5,9 +5,8 @@ import { Icon } from '@/components/icon';
 import { ConvexError } from 'convex/values';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { Mascot } from '@/components/mascot';
 import { Button, Card, Screen, Txt } from '@/components/ui';
-import { Palette, Radius } from '@/constants/dumpling';
+import { Palette, Type } from '@/constants/dumpling';
 import { BottomTabInset } from '@/constants/theme';
 import { useSession } from '@/lib/session';
 import { api } from '../../../convex/_generated/api';
@@ -44,10 +43,11 @@ export default function Feast() {
 
   return (
     <Screen bottomInset={BottomTabInset}>
-      <View style={{ gap: 8 }}><Txt variant="hero">Your family, in a show.</Txt><Txt variant="small">Small moments. A week worth keeping.</Txt></View>
+      <View style={{ gap: 8 }}><Txt variant="hero">The Sunday edition.</Txt><Txt variant="small">A little of everyone. All together.</Txt></View>
       {latest ? (
         <Card style={styles.hero}>
-          <View style={styles.cover}><View style={styles.coverRing}><Mascot size={112} steaming={latest.status !== 'failed'} mood={latest.status === 'cooking' ? 'wow' : 'smile'} /></View><Txt variant="label">Sunday Feast</Txt></View>
+          <View style={styles.cover}><Txt variant="small" style={{ color: Palette.creamDeep }}>Made around your Table</Txt><Txt style={styles.coverWord}>Sunday,
+with love.</Txt><View style={{ width: 32, height: 1, backgroundColor: Palette.creamDeep, marginTop: 12 }} /></View>
           <Txt variant="small">Week of {formatWeek(latest.weekOf)}</Txt>
           <Txt variant="hero" style={{ textAlign: 'left', alignSelf: 'stretch' }} testID="latest-feast-title">
             {latest.title}
@@ -72,7 +72,8 @@ export default function Feast() {
         </Card>
       ) : (
         <Card style={styles.hero}>
-          <View style={styles.cover}><Mascot size={96} /><Txt variant="label">The first of many Sundays</Txt></View>
+          <View style={styles.cover}><Txt style={styles.coverWord}>The first
+of many Sundays.</Txt></View>
           <Txt variant="title">Your first Feast starts here</Txt>
           <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Fold a few moments, then let the Chef bring them together. You can try a first episode before Sunday.</Txt>
         </Card>
@@ -111,18 +112,17 @@ export default function Feast() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  hero: { alignItems: 'flex-start', gap: 16, padding: 20 },
-  cover: { alignSelf: 'stretch', minHeight: 180, borderRadius: 16, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16 },
+  hero: { alignItems: 'flex-start', gap: 16, paddingVertical: 0, paddingBottom: 24 },
+  cover: { alignSelf: 'stretch', minHeight: 240, borderRadius: 4, backgroundColor: '#626B5B', alignItems: 'flex-start', justifyContent: 'center', gap: 16, padding: 28 },
+  coverWord: { fontFamily: Type.display, fontSize: 42, lineHeight: 48, color: Palette.cream, fontWeight: '400' },
   coverRing: { borderWidth: 1, borderColor: '#E5D3BD', borderRadius: 80, paddingHorizontal: 24, paddingVertical: 8 },
   cooking: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   leftover: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Palette.card,
-    borderRadius: Radius.card,
-    padding: 20,
-    borderWidth: 1,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
     borderColor: Palette.creamDeep,
   },
 });

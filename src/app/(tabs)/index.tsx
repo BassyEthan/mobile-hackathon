@@ -7,7 +7,6 @@ import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { AskTheTable } from '@/components/ask-the-table';
 import { Icon } from '@/components/icon';
 import { Sheet } from '@/components/sheet';
-import { Mascot } from '@/components/mascot';
 import { Steamer } from '@/components/steamer';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { Palette } from '@/constants/dumpling';
@@ -36,7 +35,7 @@ export default function Today() {
     return (
       <Screen scroll={false}>
         <View style={styles.center}>
-          <Mascot size={110} />
+          <Icon name="sun" size={28} color={Palette.inkSoft} />
           <Txt variant="small">Warming the steamer…</Txt>
         </View>
       </Screen>
@@ -62,10 +61,10 @@ export default function Today() {
   return (
     <Screen bottomInset={BottomTabInset}>
       <View style={styles.header}>
-        <Mascot size={38} steaming={false} />
+        
         <View style={{ flex: 1 }}>
-          <Txt variant="title">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'}, {me.displayName}</Txt>
-          <Txt variant="small">{me.tableName}</Txt>
+          <Txt variant="small" style={{ marginBottom: 8 }}>{me.tableName}</Txt>
+          <Txt variant="hero">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'},{'\n'}{me.displayName}.</Txt>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Table settings" onPress={() => setSettingsOpen(true)} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="settings" /></Pressable>
       </View>
@@ -103,8 +102,8 @@ export default function Today() {
       </View>
 
       <Card style={styles.spark}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="spark" size={18} color={Palette.accentDeep} /><Txt variant="label">Today&apos;s spark</Txt><Txt variant="small" style={{ marginLeft: 'auto' }}>Optional</Txt></View>
-        <Txt variant="title" testID="spark-text" style={{ lineHeight: 29, paddingVertical: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Txt variant="label">Today&apos;s spark</Txt><Txt variant="small" style={{ marginLeft: 'auto' }}>Optional</Txt></View>
+        <Txt variant="title" testID="spark-text" style={{ fontSize: 27, lineHeight: 36, paddingVertical: 8 }}>
           {spark?.text ?? 'Fold anything you like today.'}
         </Txt>
         {spark?.type === 'sealed' && <Txt variant="small" testID="spark-sealed">Sealed until the Sunday Feast.</Txt>}
@@ -121,8 +120,8 @@ export default function Today() {
             <View style={{ flex: 1 }}>
               <Button
                 testID="fold-spark"
-                kind="secondary"
-                icon="video"
+                kind="quiet"
+                icon="arrow"
                 label="Fold this"
                 onPress={() => {
                   if (!today.filling) return;
@@ -139,12 +138,7 @@ export default function Today() {
 
       <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
 
-      {today.members.length > 1 && (
-        <Card>
-          <Txt variant="small" selectable>Table code {me.joinCode}</Txt>
-          {canShare && <Button kind="secondary" label="Share Table code" onPress={() => void shareCode()} />}
-        </Card>
-      )}
+
     </Screen>
   );
 }
@@ -152,7 +146,7 @@ export default function Today() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  spark: { backgroundColor: Palette.card, paddingVertical: 20 },
+  spark: { paddingTop: 24, paddingBottom: 8, borderTopWidth: 1, borderBottomWidth: 1, borderColor: Palette.border },
   sparkActions: { flexDirection: 'row', gap: 10 },
   tableStats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   centerText: { textAlign: 'center' },

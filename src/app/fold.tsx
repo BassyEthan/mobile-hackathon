@@ -10,7 +10,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StatusBar } from 'expo-status-bar';
-import { Mascot } from '@/components/mascot';
+import { Icon } from '@/components/icon';
 import { Button, Txt } from '@/components/ui';
 import { Palette, Radius } from '@/constants/dumpling';
 import { useSession } from '@/lib/session';
@@ -35,7 +35,7 @@ function AudioPreview({ uri }: { uri: string }) {
   const player = useAudioPlayer(uri);
   return (
     <View style={styles.audioStage}>
-      <Mascot size={140} />
+      <Icon name="mic" size={32} color={Palette.cream} />
       <Button kind="secondary" label="Play back" onPress={() => { void player.seekTo(0); player.play(); }} />
     </View>
   );
@@ -198,7 +198,7 @@ export default function Fold() {
           </View>
         ) : (
           <View style={styles.audioStage}>
-            <Mascot size={140} mood={phase === 'recording' ? 'wow' : 'smile'} />
+            <Icon name="mic" size={32} color={phase === 'recording' ? Palette.accent : Palette.cream} />
             <Txt style={{ color: Palette.cream }}>{phase === 'recording' ? 'Listening…' : 'Voice Fold, up to ten seconds'}</Txt>
           </View>
         )}

@@ -73,7 +73,7 @@ function AudioClip({ url }: { url: string }) {
 export function DumplingCard({ dumpling, replies }: { dumpling: RevealedDumpling; replies?: Map<string, RevealedDumpling[]> }) {
   const nested = replies?.get(dumpling.id) ?? [];
   return (
-    <Card style={{ padding: 12, gap: 12 }}>
+    <Card style={{ paddingVertical: 16, gap: 12 }}>
       <Txt style={{ paddingHorizontal: 4, fontWeight: '600' }}>
         {dumpling.memberName}
       </Txt>

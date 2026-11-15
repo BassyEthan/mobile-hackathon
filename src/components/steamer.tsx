@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 
 import { DumplingCard, type RevealedDumpling } from '@/components/dumpling-card';
-import { Mascot } from '@/components/mascot';
 import { Card, Txt } from '@/components/ui';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { Palette } from '@/constants/dumpling';
@@ -63,7 +62,7 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
               <View style={[styles.avatar, m.folded && styles.avatarFolded]}>
                 <Text style={[styles.initial, m.folded && { color: Palette.cream }]}>{m.displayName.slice(0, 1).toUpperCase()}</Text>
               </View>
-              <Txt variant="small" numberOfLines={1}>
+              <Txt variant="small" numberOfLines={2}>
                 {m.isMe ? 'You' : m.displayName}
               </Txt>
             </View>
@@ -73,9 +72,9 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
       </View>
       {!lidOff ? (
         <Card style={styles.lid}>
-          <Mascot size={56} steaming={false} />
+          
           <Txt variant="title" style={{ textAlign: 'center' }}>
-            A little moment opens the lid
+            Your day belongs here.
           </Txt>
           <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>
             Share anything from your day to see your family’s moments. No spark needed.
@@ -94,9 +93,9 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
 
 const styles = StyleSheet.create({
   seats: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  seat: { alignItems: 'center', width: 62, gap: 4 },
+  seat: { alignItems: 'center', width: 72, gap: 4 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center' },
-  avatarFolded: { backgroundColor: Palette.accent },
+  avatarFolded: { backgroundColor: Palette.inkSoft },
   initial: { fontSize: 16, fontWeight: '600', color: Palette.inkSoft },
-  lid: { alignItems: 'center', paddingVertical: 24, backgroundColor: Palette.card },
+  lid: { alignItems: 'center', paddingVertical: 32 },
 });
