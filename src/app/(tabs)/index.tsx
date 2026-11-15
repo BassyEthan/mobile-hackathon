@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, Share, StyleSheet, View } from 'react-native';
 
 import { Mascot } from '@/components/mascot';
@@ -19,6 +19,7 @@ export default function Today() {
   const today = useQuery(api.today.get, auth && date ? { ...auth, date } : 'skip');
   const ensureFilling = useMutation(api.today.ensureFilling);
   const asked = useRef<string | null>(null);
+  const [sparkIndex, setSparkIndex] = useState(0);
 
   useEffect(() => {
     if (auth && date && today && today.filling === null && asked.current !== date) {
@@ -38,10 +39,10 @@ export default function Today() {
     );
   }
 
-  const iFolded = today.members.some((m) => m.isMe && m.folded);
   const days = date ? (7 - new Date(`${date}T12:00:00Z`).getUTCDay()) % 7 : null;
   const countdown = days === 0 ? 'Feast day' : days === 1 ? 'Feast tomorrow' : `Feast in ${days} days`;
-  const streak = today.streak ?? 0;
+  const sparks = today.filling?.sparks ?? [];
+  const spark = sparks[sparkIndex % Math.max(1, sparks.length)];
   const canShare = Platform.OS !== 'web' || (typeof navigator !== 'undefined' && typeof navigator.share === 'function');
   const invite = `Join ${me.tableName} in Dumpling with Table code ${me.joinCode}.`;
 
@@ -64,6 +65,16 @@ export default function Today() {
         </View>
       </View>
 
+      <Button
+        testID="fold-button"
+        big
+        label="Fold a Dumpling"
+        onPress={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push('/fold');
+        }}
+      />
+
       {today.members.length === 1 && (
         <Card>
           <Txt variant="label">Invite your family</Txt>
@@ -75,36 +86,34 @@ export default function Today() {
       )}
 
       <View style={styles.tableStats}>
+        <Txt variant="small" testID="table-week">Table week {today.week}</Txt>
         {days !== null && <Txt variant="small" testID="feast-countdown">{countdown}</Txt>}
-        <Txt variant="small" testID="table-streak">
-          {streak > 0 ? `Table streak · ${streak} ${streak === 1 ? 'week' : 'weeks'}` : 'Your first Feast starts the Table streak.'}
-        </Txt>
       </View>
 
-      <Card style={styles.filling}>
-        <Txt variant="label">Today&apos;s Filling</Txt>
-        <Txt variant="hero" testID="filling-prompt">
-          {today.filling?.prompt ?? 'Rolling out the dough…'}
+      <Card style={styles.spark}>
+        <Txt variant="label">Today&apos;s spark</Txt>
+        <Txt variant="hero" testID="spark-text">
+          {spark?.text ?? 'Rolling out the dough…'}
         </Txt>
+        {today.filling && spark && (
+          <View style={styles.sparkActions}>
+            <View style={{ flex: 1 }}>
+              <Button testID="next-spark" kind="secondary" label="Need a spark?" onPress={() => setSparkIndex((i) => (i + 1) % sparks.length)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                testID="fold-spark"
+                label="Fold this"
+                onPress={() => {
+                  if (!today.filling) return;
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: '/fold', params: { fillingId: today.filling.id, sparkKey: spark.key, prompt: spark.text } });
+                }}
+              />
+            </View>
+          </View>
+        )}
       </Card>
-
-      {iFolded ? (
-        <Txt variant="small" style={styles.centerText}>
-          You folded today. See you tomorrow.
-        </Txt>
-      ) : (
-        <Button
-          testID="fold-button"
-          big
-          label="Fold a Dumpling"
-          disabled={!today.filling}
-          onPress={() => {
-            if (!today.filling) return;
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push({ pathname: '/fold', params: { fillingId: today.filling.id, prompt: today.filling.prompt } });
-          }}
-        />
-      )}
 
       <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
 
@@ -121,7 +130,8 @@ export default function Today() {
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  filling: { backgroundColor: Palette.creamDeep, paddingVertical: 28 },
+  spark: { backgroundColor: Palette.creamDeep, paddingVertical: 24 },
+  sparkActions: { flexDirection: 'row', gap: 10 },
   tableStats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   centerText: { textAlign: 'center' },
 });

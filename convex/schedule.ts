@@ -8,6 +8,7 @@ import { FILLING_PROMPTS, dateInZone, localHour, weekOfFor } from "./lib";
 export const SUNDAY_COOK_HOUR = 17;
 
 export async function ensureFillingFor(ctx: MutationCtx, table: Doc<"tables">, date: string) {
+  if (!table.today || table.today < date) await ctx.db.patch("tables", table._id, { today: date });
   const existing = await ctx.db
     .query("fillings")
     .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))

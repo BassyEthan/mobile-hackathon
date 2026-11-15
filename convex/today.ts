@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { ensureFillingFor } from "./schedule";
-import { addDays, dateInZone, isDate, isFillingOpen, requireMember, sessionArgs, weekOfFor } from "./lib";
+import { canSeeDumpling, dateInZone, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, weekOfFor } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -19,6 +19,9 @@ export const revealedDumpling = v.object({
   url: v.union(v.string(), v.null()),
   caption: v.union(v.string(), v.null()),
   createdAt: v.number(),
+  spark: v.union(v.string(), v.null()),
+  replyTo: v.union(v.id("dumplings"), v.null()),
+  replyToName: v.union(v.string(), v.null()),
   reactions: reactionSummary,
 });
 
@@ -43,6 +46,8 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
       });
     }
   }
+  const parent = dumpling.replyTo ? await ctx.db.get("dumplings", dumpling.replyTo) : null;
+  const parentAuthor = parent ? await ctx.db.get("members", parent.memberId) : null;
   return {
     id: dumpling._id,
     memberId: dumpling.memberId,
@@ -51,71 +56,58 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
     url: await ctx.storage.getUrl(dumpling.mediaStorageId),
     caption: dumpling.translation?.[viewer.language] ?? dumpling.transcript ?? null,
     createdAt: dumpling.createdAt,
+    spark: dumpling.sparkText ?? null,
+    replyTo: parent?._id ?? null,
+    replyToName: parent ? (parentAuthor?.displayName ?? "Someone") : null,
     reactions: { counts, mine, voices },
   };
 }
 
-async function tableStreak(ctx: QueryCtx, tableId: Doc<"tables">["_id"], week: string) {
-  let streak = 0;
-  let expectedWeek = week;
-  const feasts = ctx.db.query("feasts").withIndex("by_tableId_and_weekOf", (q) =>
-    q.eq("tableId", tableId).lte("weekOf", week),
-  ).order("desc");
-  for await (const feast of feasts) {
-    if (feast.status !== "ready" || feast.weekOf > expectedWeek) continue;
-    if (streak === 0 && feast.weekOf === addDays(week, -7)) expectedWeek = feast.weekOf;
-    if (feast.weekOf !== expectedWeek) break;
-    streak++;
-    expectedWeek = addDays(expectedWeek, -7);
-  }
-  return streak;
+function tableWeek(table: Doc<"tables">, date: string) {
+  const first = weekOfFor(dateInZone(table.createdAt, table.timeZone));
+  const days = Math.round((Date.parse(`${weekOfFor(date)}T12:00:00Z`) - Date.parse(`${first}T12:00:00Z`)) / 86_400_000);
+  return Math.max(1, Math.floor(days / 7) + 1);
 }
 
 export const get = query({
   args: { ...sessionArgs, date: v.string() },
   returns: v.object({
-    filling: v.union(v.null(), v.object({ id: v.id("fillings"), date: v.string(), prompt: v.string() })),
+    filling: v.union(
+      v.null(),
+      v.object({
+        id: v.id("fillings"),
+        date: v.string(),
+        prompt: v.string(),
+        sparks: v.array(v.object({ key: v.string(), text: v.string() })),
+      }),
+    ),
     members: v.array(v.object({ id: v.id("members"), displayName: v.string(), folded: v.boolean(), isMe: v.boolean() })),
     lidOff: v.boolean(),
-    streak: v.number(),
+    week: v.number(),
     dumplings: v.array(revealedDumpling),
   }),
   handler: async (ctx, args) => {
     const { member, table } = await requireMember(ctx, args);
+    const date = isDate(args.date) ? args.date : dateInZone(table.createdAt, table.timeZone);
     const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
-    const streak = await tableStreak(ctx, table._id, weekOfFor(dateInZone(Date.now(), table.timeZone)));
-    const filling = isDate(args.date)
-      ? await ctx.db
-          .query("fillings")
-          .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", args.date))
-          .unique()
-      : null;
-    if (!filling) {
-      return {
-        filling: null,
-        members: members.map((m) => ({ id: m._id, displayName: m.displayName, folded: false, isMe: m._id === member._id })),
-        lidOff: false,
-        streak,
-        dumplings: [],
-      };
-    }
-    const folded = new Map<string, Doc<"dumplings">>();
-    for (const m of members) {
-      const dumpling = await ctx.db
-        .query("dumplings")
-        .withIndex("by_fillingId_and_memberId", (q) => q.eq("fillingId", filling._id).eq("memberId", m._id))
-        .first();
-      if (dumpling) folded.set(m._id, dumpling);
-    }
-    const lidOff = (members.length > 1 && folded.has(member._id)) || !(await isFillingOpen(ctx, filling));
+    const filling = await ctx.db
+      .query("fillings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
+      .unique();
+    const todays = await ctx.db
+      .query("dumplings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
+      .take(200);
+    const folded = new Set(todays.map((d) => d.memberId));
+    const lidOff = folded.has(member._id) || !(await isDayOpen(ctx, table, date));
     const dumplings = [];
     if (lidOff) {
-      for (const dumpling of [...folded.values()].sort((a, b) => a.createdAt - b.createdAt)) {
-        dumplings.push(await describeDumpling(ctx, member, dumpling));
+      for (const dumpling of todays.sort((a, b) => a.createdAt - b.createdAt)) {
+        if (await canSeeDumpling(ctx, member, dumpling)) dumplings.push(await describeDumpling(ctx, member, dumpling));
       }
     }
     return {
-      filling: { id: filling._id, date: filling.date, prompt: filling.prompt },
+      filling: filling ? { id: filling._id, date: filling.date, prompt: filling.prompt, sparks: sparksFor(filling) } : null,
       members: members.map((m) => ({
         id: m._id,
         displayName: m.displayName,
@@ -123,7 +115,7 @@ export const get = query({
         isMe: m._id === member._id,
       })),
       lidOff,
-      streak,
+      week: tableWeek(table, date),
       dumplings,
     };
   },

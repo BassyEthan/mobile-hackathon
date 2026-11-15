@@ -46,6 +46,7 @@ export default defineSchema({
     chefName: v.string(),
     timeZone: v.string(),
     createdAt: v.number(),
+    today: v.optional(v.string()),
   }).index("by_joinCode", ["joinCode"]),
   members: defineTable({
     tableId: v.id("tables"),
@@ -64,8 +65,14 @@ export default defineSchema({
   dumplings: defineTable({
     tableId: v.id("tables"),
     memberId: v.id("members"),
-    fillingId: v.id("fillings"),
+    fillingId: v.optional(v.id("fillings")),
     date: v.optional(v.string()),
+    answeredSpark: v.optional(v.boolean()),
+    sparkKey: v.optional(v.string()),
+    sparkText: v.optional(v.string()),
+    replyTo: v.optional(v.id("dumplings")),
+    sealed: v.optional(v.boolean()),
+    hiddenFrom: v.optional(v.array(v.id("members"))),
     mediaStorageId: v.id("_storage"),
     mediaType: v.union(v.literal("video"), v.literal("audio")),
     transcript: v.optional(v.string()),
@@ -75,7 +82,9 @@ export default defineSchema({
   })
     .index("by_fillingId_and_memberId", ["fillingId", "memberId"])
     .index("by_tableId_and_createdAt", ["tableId", "createdAt"])
-    .index("by_tableId_and_date", ["tableId", "date"]),
+    .index("by_tableId_and_date", ["tableId", "date"])
+    .index("by_memberId_and_date", ["memberId", "date"])
+    .index("by_replyTo", ["replyTo"]),
   reactions: defineTable({
     dumplingId: v.id("dumplings"),
     memberId: v.id("members"),

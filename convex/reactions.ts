@@ -9,7 +9,7 @@ export const TAP_KINDS = ["heart", "laugh", "wow", "cry", "yum"];
 async function visibleDumpling(ctx: MutationCtx, member: Doc<"members">, dumplingId: Id<"dumplings">) {
   const dumpling = await ctx.db.get("dumplings", dumplingId);
   if (!dumpling || !(await canSeeDumpling(ctx, member, dumpling))) {
-    throw new ConvexError("Fold today's Filling to lift the lid first.");
+    throw new ConvexError("Fold anything today to lift the lid first.");
   }
   return dumpling;
 }

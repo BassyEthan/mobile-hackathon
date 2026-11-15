@@ -41,7 +41,7 @@ function AudioPreview({ uri }: { uri: string }) {
 }
 
 export default function Fold() {
-  const { fillingId, prompt } = useLocalSearchParams<{ fillingId: string; prompt?: string }>();
+  const { fillingId, sparkKey, replyTo, prompt } = useLocalSearchParams<{ fillingId?: string; sparkKey?: string; replyTo?: string; prompt?: string }>();
   const { auth } = useSession();
   const insets = useSafeAreaInsets();
   const [cameraPermission, requestCamera] = useCameraPermissions();
@@ -124,14 +124,20 @@ export default function Fold() {
   };
 
   const send = async () => {
-    if (!take || !auth || !fillingId) return;
+    if (!take || !auth) return;
     setPhase('uploading');
     setProgress(0);
     setError(null);
     try {
       const url = await generateUploadUrl({ ...auth });
       const storageId = await uploadToConvex(url, take.uri, take.mediaType === 'video' ? 'video/quicktime' : 'audio/mp4', setProgress);
-      await fold({ ...auth, fillingId: fillingId as Id<'fillings'>, storageId: storageId as Id<'_storage'>, mediaType: take.mediaType });
+      await fold({
+        ...auth,
+        storageId: storageId as Id<'_storage'>,
+        mediaType: take.mediaType,
+        ...(fillingId ? { fillingId: fillingId as Id<'fillings'>, sparkKey } : {}),
+        ...(replyTo ? { replyTo: replyTo as Id<'dumplings'> } : {}),
+      });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e) {
@@ -157,7 +163,7 @@ export default function Fold() {
         )}
       </View>
       <Txt variant="title" style={styles.prompt}>
-        {prompt}
+        {prompt ?? 'Anything goes. Ten seconds.'}
       </Txt>
 
       <View style={styles.stage}>
