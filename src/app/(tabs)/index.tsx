@@ -1,8 +1,11 @@
 import { useMutation, useQuery } from 'convex/react';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Mascot } from '@/components/mascot';
+import { Steamer } from '@/components/steamer';
 import { Button, Card, Screen, Txt } from '@/components/ui';
 import { Palette } from '@/constants/dumpling';
 import { BottomTabInset } from '@/constants/theme';
@@ -35,7 +38,7 @@ export default function Today() {
     );
   }
 
-  const folded = today.members.filter((m) => m.folded);
+  const iFolded = today.members.some((m) => m.isMe && m.folded);
 
   return (
     <Screen bottomInset={BottomTabInset}>
@@ -54,20 +57,25 @@ export default function Today() {
         </Txt>
       </Card>
 
-      <Button testID="fold-button" big label="Fold" onPress={() => {}} disabled />
-      <Txt variant="small" style={styles.centerText}>
-        Recording arrives in the next milestone.
-      </Txt>
-
-      <Card>
-        <Txt variant="label">The Steamer</Txt>
-        <Txt testID="steamer-status">
-          {folded.length === 0
-            ? 'Nobody has folded yet today.'
-            : `${folded.map((m) => (m.isMe ? 'You' : m.displayName)).join(', ')} folded today.`}
+      {iFolded ? (
+        <Txt variant="small" style={styles.centerText}>
+          You folded today. See you tomorrow.
         </Txt>
-        <Txt variant="small">{today.lidOff ? 'The lid is off.' : 'The lid stays on until you fold.'}</Txt>
-      </Card>
+      ) : (
+        <Button
+          testID="fold-button"
+          big
+          label="Fold"
+          disabled={!today.filling}
+          onPress={() => {
+            if (!today.filling) return;
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push({ pathname: '/fold', params: { fillingId: today.filling.id, prompt: today.filling.prompt } });
+          }}
+        />
+      )}
+
+      <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
     </Screen>
   );
 }

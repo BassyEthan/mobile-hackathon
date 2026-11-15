@@ -28,6 +28,7 @@ function RootStack() {
       </Stack.Protected>
       <Stack.Protected guard={!!token}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="fold" options={{ presentation: 'fullScreenModal' }} />
       </Stack.Protected>
     </Stack>
   );
