@@ -6,7 +6,7 @@ import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { segment } from "./schema";
-import { FILLING_PROMPTS } from "./lib";
+import { FILLING_PROMPTS, seatLine } from "./lib";
 
 type Segment = Infer<typeof segment>;
 type Gathered = NonNullable<FunctionReturnType<typeof internal.feasts.gather>>;
@@ -30,10 +30,10 @@ export function pickClips(data: Gathered) {
   return picked.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function folds(data: Gathered) {
-  const counts = new Map(data.members.map((m) => [m.name, 0]));
-  for (const clip of data.clips) counts.set(clip.memberName, (counts.get(clip.memberName) ?? 0) + 1);
-  return counts;
+function withSeats(data: Gathered, segments: Segment[]): Segment[] {
+  const folded = new Set(data.clips.map((c) => c.memberId));
+  const seats: Segment[] = data.members.filter((m) => !folded.has(m.id)).map((m) => ({ type: "hostLine", text: seatLine(m.name) }));
+  return [...segments.slice(0, -1), ...seats, ...segments.slice(-1)];
 }
 
 export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
@@ -47,7 +47,7 @@ export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
     segments.push({ type: "hostLine", text: "The steamer was quiet this week, so the chef ate the leftovers." });
   }
   clips.forEach((clip, i) => {
-    if (i % 2 === 0) segments.push({ type: "hostLine", text: `Here is ${clip.memberName}, answering "${clip.prompt}"` });
+    if (i % 2 === 0) segments.push({ type: "hostLine", text: clip.prompt ? `Here is ${clip.memberName}, answering "${clip.prompt}"` : `Here is ${clip.memberName}, folding whatever they liked.` });
     segments.push({ type: "clip", dumplingId: clip.id });
   });
   const foreign = data.clips.find((c) => c.language && c.language !== "en" && c.transcript && c.english);
@@ -58,18 +58,13 @@ export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
   if (golden) {
     segments.push({ type: "award", award: "Golden Dumpling", memberName: golden.memberName, text: `${golden.reactionCount} reactions, and not one of them was polite.`, dumplingId: golden.id });
   }
-  const counts = [...folds(data).entries()].sort((a, b) => a[1] - b[1]);
-  if (counts.length > 0) {
-    const [name, n] = counts[0];
-    segments.push({ type: "award", award: "Empty Plate", memberName: name, text: n === 0 ? "No dumplings this week. We kept your chair warm." : `Only ${n} this week. The steamer misses you.` });
-  }
   const secretIngredient = FILLING_PROMPTS[(data.weekOf.length + data.clips.length) % FILLING_PROMPTS.length];
   segments.push({ type: "secretIngredient", prompt: secretIngredient, text: "Next week's first Filling. Start thinking." });
   return {
     title: clips.length > 0 ? `Feast: ${clips.map((c) => c.memberName).filter((n, i, all) => all.indexOf(n) === i).slice(0, 3).join(", ")} and friends` : "Feast: A Quiet Week",
-    segments,
+    segments: withSeats(data, segments),
     secretIngredient,
-    summary: `${data.tableName} week of ${data.weekOf}: ${clips.map((c) => `${c.memberName} on "${c.prompt}": ${c.english ?? c.transcript ?? "a clip"}`).join("; ")}`,
+    summary: `${data.tableName} week of ${data.weekOf}: ${clips.map((c) => `${c.memberName}${c.prompt ? ` on "${c.prompt}"` : ""}: ${c.english ?? c.transcript ?? "a clip"}`).join("; ")}`,
   };
 }
 
@@ -95,7 +90,7 @@ const FLAT_SEGMENT = {
     phrase: { type: ["string", "null"] },
     romanization: { type: ["string", "null"] },
     meaning: { type: ["string", "null"] },
-    award: { type: ["string", "null"], enum: ["Golden Dumpling", "Empty Plate", null] },
+    award: { type: ["string", "null"], enum: ["Golden Dumpling", null] },
     memberName: { type: ["string", "null"] },
     prompt: { type: ["string", "null"] },
   },
@@ -168,14 +163,12 @@ export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clip
   if (clips.some((c) => c.language && c.language !== "en") && !segments.some((s) => s.type === "titleCard" && s.title === "Mother Tongue" && s.phrase && s.meaning)) {
     throw new Error("Include a Mother Tongue titleCard with phrase, romanization and meaning");
   }
-  for (const award of ["Golden Dumpling", "Empty Plate"]) {
-    if (!segments.some((s) => s.type === "award" && s.award === award)) throw new Error(`Include the ${award} award`);
-  }
+  if (!segments.some((s) => s.type === "award" && s.award === "Golden Dumpling")) throw new Error("Include the Golden Dumpling award");
   const last = segments[segments.length - 1];
   if (last?.type !== "secretIngredient" || segments.filter((s) => s.type === "secretIngredient").length !== 1) {
     throw new Error("End with exactly one secretIngredient");
   }
-  return { title: plan.title.slice(0, 80), segments, secretIngredient: last.prompt, summary: typeof plan.summary === "string" ? plan.summary : plan.title };
+  return { title: plan.title.slice(0, 80), segments: withSeats(data, segments), secretIngredient: last.prompt, summary: typeof plan.summary === "string" ? plan.summary : plan.title };
 }
 
 async function openai(path: string, body: unknown) {
@@ -247,14 +240,13 @@ async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
     chef: data.chefName,
     members: data.members.map((m) => m.name),
     captionLanguages: [...new Set(data.members.map((m) => m.language).filter((l) => l !== "en"))],
-    foldsThisWeek: Object.fromEntries(folds(data)),
     lastWeek: data.previous,
     callbacks: memories,
     clips: clips.map((c) => ({
       dumplingId: c.id,
       member: c.memberName,
       day: c.date,
-      filling: c.prompt,
+      spark: c.prompt,
       language: c.language,
       original: c.transcript,
       english: c.english,
@@ -263,7 +255,7 @@ async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
     })),
   };
   const instructions = `You are ${data.chefName}, host of a family's Sunday show called the Feast. Write the episode as an ordered list of segments.
-Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId) and award "Empty Plate" (gentle nudge to whoever folded least). End with exactly one secretIngredient: a new Filling prompt for next week plus a one-line tease. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
+Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId). Never nudge or count anyone's folds. End with exactly one secretIngredient: a new Filling prompt for next week plus a one-line tease. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
   let feedback = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await openai("/responses", {

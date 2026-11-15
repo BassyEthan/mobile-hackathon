@@ -41,9 +41,16 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
     wasOn.current = !lidOff;
   }, [lidOff]);
 
-  const folded = members.filter((m) => m.folded);
-  const waiting = members.filter((m) => !m.isMe && !m.folded).map((m) => m.displayName);
-  const waitingForFamily = members.length === 1 && folded.length === 1;
+  const folded = members.filter((m) => m.folded).map((m) => (m.isMe ? 'You' : m.displayName));
+  const inLine = folded.length === 0
+    ? 'The steamer is warm.'
+    : `${folded.length === 1 ? folded[0] : `${folded.slice(0, -1).join(', ')} and ${folded[folded.length - 1]}`} ${folded.length === 1 && folded[0] !== 'You' ? 'is' : 'are'} in.`;
+  const shown = new Set(dumplings.map((d) => d.id));
+  const replies = new Map<string, RevealedDumpling[]>();
+  for (const d of dumplings) {
+    if (d.replyTo && shown.has(d.replyTo)) replies.set(d.replyTo, [...(replies.get(d.replyTo) ?? []), d]);
+  }
+  const roots = dumplings.filter((d) => !d.replyTo || !shown.has(d.replyTo));
   return (
     <View style={{ gap: 14 }}>
       <Card>
@@ -60,15 +67,7 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
             </View>
           ))}
         </View>
-        <Txt testID="steamer-status">
-          {folded.length === 0
-            ? 'Nobody has folded yet. The steamer is warm.'
-            : `${folded.length} of ${members.length} folded today.`}
-          {waitingForFamily ? ' Waiting on your family.' : ''}
-        </Txt>
-        {waiting.length > 0 && (
-          <Txt variant="small" testID="steamer-waiting">Waiting on {waiting.join(', ')}.</Txt>
-        )}
+        <Txt testID="steamer-status">{inLine}</Txt>
       </Card>
       {!lidOff ? (
         <Card style={styles.lid}>
@@ -77,13 +76,13 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
             The lid is on
           </Txt>
           <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>
-            {waitingForFamily ? 'Invite someone to your Table to lift the lid.' : "Fold today's Filling to see everyone's."}
+            Fold anything today to see what everyone folded.
           </Txt>
         </Card>
       ) : (
-        dumplings.map((d, i) => (
+        roots.map((d, i) => (
           <Reveal key={d.id} index={i}>
-            <DumplingCard dumpling={d} />
+            <DumplingCard dumpling={d} replies={replies} />
           </Reveal>
         ))
       )}

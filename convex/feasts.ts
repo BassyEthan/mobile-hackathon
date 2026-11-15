@@ -1,9 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import { segment } from "./schema";
-import { addDays, canSeeDumpling, isFillingOpen, requireMember, sessionArgs } from "./lib";
+import { addDays, canSeeDumpling, isDayOpen, seatLine, requireMember, sessionArgs } from "./lib";
 import { startCook } from "./schedule";
 import { describeDumpling, revealedDumpling } from "./today";
 
@@ -72,7 +71,7 @@ export const get = query({
         });
       } else if (s.type === "clip") {
         const dumpling = await ctx.db.get("dumplings", s.dumplingId);
-        if (dumpling && (await canSeeDumpling(ctx, member, dumpling))) {
+        if (dumpling && (await canSeeDumpling(ctx, member, dumpling, { inFeast: feast.status === "ready" }))) {
           segments.push({ type: s.type, dumpling: await describeDumpling(ctx, member, dumpling) });
         }
       } else if (s.type === "titleCard") {
@@ -84,6 +83,8 @@ export const get = query({
           romanization: s.romanization ?? null,
           meaning: s.meaning ?? null,
         });
+      } else if (s.type === "award" && s.award === "Empty Plate") {
+        segments.push({ type: "hostLine" as const, text: seatLine(s.memberName), audioUrl: null });
       } else if (s.type === "award") {
         segments.push({ type: s.type, award: s.award, memberName: s.memberName, text: s.translations?.[member.language] ?? s.text });
       } else {
@@ -122,7 +123,7 @@ const gatheredClip = v.object({
   memberId: v.id("members"),
   memberName: v.string(),
   date: v.string(),
-  prompt: v.string(),
+  prompt: v.union(v.string(), v.null()),
   mediaType: v.string(),
   transcript: v.union(v.string(), v.null()),
   language: v.union(v.string(), v.null()),
@@ -156,23 +157,17 @@ export const gather = internalQuery({
       .query("dumplings")
       .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", addDays(feast.weekOf, -6)).lte("date", feast.weekOf))
       .take(80);
-    const fillingOpen = new Map<Id<"fillings">, { open: boolean; date: string; prompt: string }>();
     const clips = [];
     for (const d of dumplings) {
-      if (!fillingOpen.has(d.fillingId)) {
-        const filling = await ctx.db.get("fillings", d.fillingId);
-        if (!filling) continue;
-        fillingOpen.set(d.fillingId, { open: await isFillingOpen(ctx, filling), date: filling.date, prompt: filling.prompt });
-      }
-      const info = fillingOpen.get(d.fillingId)!;
-      if (info.open) continue;
+      if (!d.date || d.hiddenFrom?.length || (await isDayOpen(ctx, table, d.date))) continue;
+      const filling = !d.sparkText && d.fillingId && d.answeredSpark !== false ? await ctx.db.get("fillings", d.fillingId) : null;
       const reactions = await ctx.db.query("reactions").withIndex("by_dumplingId", (q) => q.eq("dumplingId", d._id)).take(200);
       clips.push({
         id: d._id,
         memberId: d.memberId,
         memberName: names.get(d.memberId) ?? "Someone",
-        date: info.date,
-        prompt: info.prompt,
+        date: d.date,
+        prompt: d.sparkText ?? filling?.prompt ?? null,
         mediaType: d.mediaType,
         transcript: d.transcript ?? null,
         language: d.language ?? null,

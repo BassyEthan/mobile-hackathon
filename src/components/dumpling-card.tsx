@@ -1,10 +1,11 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useEvent } from 'expo';
+import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ReactionBar, type ReactionSummary } from '@/components/reactions';
-import { Card, Txt } from '@/components/ui';
+import { Button, Card, Txt } from '@/components/ui';
 import { Palette, Radius } from '@/constants/dumpling';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -14,6 +15,9 @@ export type RevealedDumpling = {
   mediaType: 'video' | 'audio';
   url: string | null;
   caption: string | null;
+  spark?: string | null;
+  replyTo?: Id<'dumplings'> | null;
+  replyToName?: string | null;
   reactions: ReactionSummary;
 };
 
@@ -63,15 +67,35 @@ function AudioClip({ url }: { url: string }) {
   );
 }
 
-export function DumplingCard({ dumpling }: { dumpling: RevealedDumpling }) {
+export function DumplingCard({ dumpling, replies }: { dumpling: RevealedDumpling; replies?: Map<string, RevealedDumpling[]> }) {
+  const nested = replies?.get(dumpling.id) ?? [];
   return (
     <Card style={{ padding: 14 }}>
       <Txt variant="title" style={{ paddingHorizontal: 6 }}>
         {dumpling.memberName}
       </Txt>
+      {dumpling.replyToName && !replies?.has(dumpling.replyTo ?? '') && (
+        <Txt variant="small" style={{ paddingHorizontal: 6 }}>Folding back to {dumpling.replyToName}</Txt>
+      )}
+      {dumpling.spark && <Txt variant="small" style={{ paddingHorizontal: 6 }}>{dumpling.spark}</Txt>}
       {dumpling.url && (dumpling.mediaType === 'video' ? <VideoClip url={dumpling.url} /> : <AudioClip url={dumpling.url} />)}
       {dumpling.caption && <Txt style={{ paddingHorizontal: 6 }}>{dumpling.caption}</Txt>}
       <ReactionBar dumplingId={dumpling.id} reactions={dumpling.reactions} />
+      {replies && (
+        <Button
+          testID={`fold-back-${dumpling.id}`}
+          kind="quiet"
+          label={`Fold back to ${dumpling.memberName}`}
+          onPress={() => router.push({ pathname: '/fold', params: { replyTo: dumpling.id, prompt: `Fold back to ${dumpling.memberName}` } })}
+        />
+      )}
+      {nested.length > 0 && (
+        <View style={styles.replies}>
+          {nested.map((reply) => (
+            <DumplingCard key={reply.id} dumpling={reply} replies={replies} />
+          ))}
+        </View>
+      )}
     </Card>
   );
 }
@@ -81,4 +105,5 @@ const styles = StyleSheet.create({
   audio: { aspectRatio: 3, backgroundColor: Palette.creamDeep, alignItems: 'center', justifyContent: 'center', gap: 4 },
   play: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   playText: { fontSize: 44, color: Palette.cream },
+  replies: { gap: 10, paddingLeft: 12, borderLeftWidth: 3, borderLeftColor: Palette.creamDeep },
 });
