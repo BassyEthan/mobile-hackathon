@@ -5,6 +5,7 @@ export const segment = v.union(
   v.object({
     type: v.literal("hostLine"),
     text: v.string(),
+    translations: v.optional(v.record(v.string(), v.string())),
     audioStorageId: v.optional(v.id("_storage")),
   }),
   v.object({
@@ -24,12 +25,14 @@ export const segment = v.union(
     award: v.string(),
     memberName: v.string(),
     text: v.string(),
+    translations: v.optional(v.record(v.string(), v.string())),
     dumplingId: v.optional(v.id("dumplings")),
   }),
   v.object({
     type: v.literal("secretIngredient"),
     prompt: v.string(),
     text: v.string(),
+    translations: v.optional(v.record(v.string(), v.string())),
   }),
 );
 
@@ -62,6 +65,7 @@ export default defineSchema({
     tableId: v.id("tables"),
     memberId: v.id("members"),
     fillingId: v.id("fillings"),
+    date: v.optional(v.string()),
     mediaStorageId: v.id("_storage"),
     mediaType: v.union(v.literal("video"), v.literal("audio")),
     transcript: v.optional(v.string()),
@@ -70,7 +74,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_fillingId_and_memberId", ["fillingId", "memberId"])
-    .index("by_tableId_and_createdAt", ["tableId", "createdAt"]),
+    .index("by_tableId_and_createdAt", ["tableId", "createdAt"])
+    .index("by_tableId_and_date", ["tableId", "date"]),
   reactions: defineTable({
     dumplingId: v.id("dumplings"),
     memberId: v.id("members"),

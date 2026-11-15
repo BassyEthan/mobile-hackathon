@@ -20,7 +20,7 @@ function deviceTimeZone() {
 }
 
 export default function Welcome() {
-  const { setToken } = useSession();
+  const { setAuth } = useSession();
   const join = useMutation(api.tables.join);
   const create = useMutation(api.tables.create);
   const [mode, setMode] = useState<Mode>('join');
@@ -41,7 +41,7 @@ export default function Welcome() {
         mode === 'join'
           ? await join({ joinCode: code, displayName: name, language })
           : await create({ tableName, displayName: name, language, timeZone: deviceTimeZone() });
-      await setToken(result.token);
+      await setAuth({ token: result.token, memberId: result.memberId });
     } catch (e) {
       setError(e instanceof ConvexError ? String(e.data) : `Something went wrong: ${e instanceof Error ? e.message : String(e)}`);
       setBusy(false);

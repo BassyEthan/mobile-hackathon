@@ -131,9 +131,9 @@ function Card({ segment, onDone, paused }: { segment: Exclude<Segment, { type: '
 
 export default function Player() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useSession();
+  const { auth } = useSession();
   const insets = useSafeAreaInsets();
-  const feast = useQuery(api.feasts.get, token && id ? { token, feastId: id as Id<'feasts'> } : 'skip');
+  const feast = useQuery(api.feasts.get, auth && id ? { ...auth, feastId: id as Id<'feasts'> } : 'skip');
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const advance = useCallback(() => setIndex((i) => i + 1), []);

@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { addDays, hashToken, isDate } from "./lib";
+import { addDays, hashToken, isDate, weekOfFor } from "./lib";
 
 export const DEMO_JOIN_CODE = "DUMPLN";
 
@@ -117,12 +117,13 @@ export const demo = mutation({
       );
     }
 
-    const fold = async (fillingId: Id<"fillings">, clipIndex: number, createdAt: number, memberOverride?: number) => {
+    const fold = async (fillingId: Id<"fillings">, date: string, clipIndex: number, createdAt: number, memberOverride?: number) => {
       const clip = CLIPS[clipIndex];
       return await ctx.db.insert("dumplings", {
         tableId,
         memberId: memberIds[memberOverride ?? clip.member],
         fillingId,
+        date,
         mediaStorageId: args.clips[clipIndex],
         mediaType: "video",
         transcript: clip.transcript,
@@ -135,16 +136,17 @@ export const demo = mutation({
     const byClip: Record<number, Id<"dumplings">> = {};
     for (let i = 0; i < PAST_DAYS.length; i++) {
       const offset = i - PAST_DAYS.length;
-      const fillingId = await ctx.db.insert("fillings", { tableId, date: addDays(args.today, offset), prompt: PROMPTS[i] });
+      const date = addDays(args.today, offset);
+      const fillingId = await ctx.db.insert("fillings", { tableId, date, prompt: PROMPTS[i] });
       for (const [j, clipIndex] of PAST_DAYS[i].entries()) {
-        const id = await fold(fillingId, clipIndex, now + offset * 86_400_000 + j * 600_000);
+        const id = await fold(fillingId, date, clipIndex, now + offset * 86_400_000 + j * 600_000);
         byClip[clipIndex] = id;
       }
     }
     const todayFilling = await ctx.db.insert("fillings", { tableId, date: args.today, prompt: PROMPTS[6] });
-    await fold(todayFilling, 0, now - 3 * 3_600_000);
-    await fold(todayFilling, 4, now - 2 * 3_600_000);
-    await fold(todayFilling, 2, now - 3_600_000);
+    await fold(todayFilling, args.today, 0, now - 3 * 3_600_000);
+    await fold(todayFilling, args.today, 4, now - 2 * 3_600_000);
+    await fold(todayFilling, args.today, 2, now - 3_600_000);
 
     const reactionPlan: Array<[number, number, string]> = [
       [2, 0, "heart"], [2, 1, "laugh"], [2, 3, "laugh"], [2, 4, "wow"],
@@ -154,8 +156,7 @@ export const demo = mutation({
       await ctx.db.insert("reactions", { dumplingId: byClip[clipIndex], memberId: memberIds[memberIndex], kind, createdAt: now });
     }
 
-    const day = new Date(`${args.today}T12:00:00Z`).getUTCDay();
-    const sunday = addDays(args.today, -day);
+    const sunday = addDays(weekOfFor(args.today), -7);
     await ctx.db.insert("feasts", {
       tableId,
       weekOf: addDays(sunday, -7),

@@ -3,7 +3,8 @@ import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { segment } from "./schema";
-import { canSeeDumpling, dateInZone, isFillingOpen, requireMember } from "./lib";
+import { addDays, canSeeDumpling, isFillingOpen, requireMember, sessionArgs } from "./lib";
+import { startCook } from "./schedule";
 import { describeDumpling, revealedDumpling } from "./today";
 
 const feastSummary = v.object({
@@ -16,10 +17,10 @@ const feastSummary = v.object({
 });
 
 export const list = query({
-  args: { token: v.string() },
+  args: sessionArgs,
   returns: v.array(feastSummary),
   handler: async (ctx, args) => {
-    const { table } = await requireMember(ctx, args.token);
+    const { table } = await requireMember(ctx, args);
     const feasts = await ctx.db
       .query("feasts")
       .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", table._id))
@@ -52,19 +53,23 @@ const playableSegment = v.union(
 );
 
 export const get = query({
-  args: { token: v.string(), feastId: v.id("feasts") },
+  args: { ...sessionArgs, feastId: v.id("feasts") },
   returns: v.union(
     v.null(),
     v.object({ title: v.string(), chefName: v.string(), status: v.string(), segments: v.array(playableSegment) }),
   ),
   handler: async (ctx, args) => {
-    const { member, table } = await requireMember(ctx, args.token);
+    const { member, table } = await requireMember(ctx, args);
     const feast = await ctx.db.get("feasts", args.feastId);
     if (!feast || feast.tableId !== table._id) return null;
     const segments = [];
     for (const s of feast.segments) {
       if (s.type === "hostLine") {
-        segments.push({ type: s.type, text: s.text, audioUrl: s.audioStorageId ? await ctx.storage.getUrl(s.audioStorageId) : null });
+        segments.push({
+          type: s.type,
+          text: s.translations?.[member.language] ?? s.text,
+          audioUrl: s.audioStorageId ? await ctx.storage.getUrl(s.audioStorageId) : null,
+        });
       } else if (s.type === "clip") {
         const dumpling = await ctx.db.get("dumplings", s.dumplingId);
         if (dumpling && (await canSeeDumpling(ctx, member, dumpling))) {
@@ -80,9 +85,9 @@ export const get = query({
           meaning: s.meaning ?? null,
         });
       } else if (s.type === "award") {
-        segments.push({ type: s.type, award: s.award, memberName: s.memberName, text: s.text });
+        segments.push({ type: s.type, award: s.award, memberName: s.memberName, text: s.translations?.[member.language] ?? s.text });
       } else {
-        segments.push({ type: s.type, prompt: s.prompt, text: s.text });
+        segments.push({ type: s.type, prompt: s.prompt, text: s.translations?.[member.language] ?? s.text });
       }
     }
     return { title: feast.title, chefName: table.chefName, status: feast.status, segments };
@@ -90,36 +95,19 @@ export const get = query({
 });
 
 export const cook = mutation({
-  args: { token: v.string() },
+  args: sessionArgs,
   returns: v.id("feasts"),
   handler: async (ctx, args) => {
-    const { table } = await requireMember(ctx, args.token);
-    const recent = await ctx.db
-      .query("feasts")
-      .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", table._id))
-      .order("desc")
-      .take(5);
-    const cooking = recent.find((f) => f.status === "cooking" && Date.now() - f.createdAt < 5 * 60_000);
-    if (cooking) return cooking._id;
-    const weekOf = dateInZone(Date.now(), table.timeZone);
-    const feastId = await ctx.db.insert("feasts", {
-      tableId: table._id,
-      weekOf,
-      title: "Cooking…",
-      status: "cooking",
-      segments: [],
-      createdAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, internal.chef.cook, { feastId });
-    return feastId;
+    const { table } = await requireMember(ctx, args);
+    return await startCook(ctx, table, Date.now());
   },
 });
 
 export const retry = mutation({
-  args: { token: v.string(), feastId: v.id("feasts") },
+  args: { ...sessionArgs, feastId: v.id("feasts") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { table } = await requireMember(ctx, args.token);
+    const { table } = await requireMember(ctx, args);
     const feast = await ctx.db.get("feasts", args.feastId);
     if (!feast || feast.tableId !== table._id) throw new ConvexError("That Feast is not on your Table.");
     if (feast.status !== "failed") return null;
@@ -164,10 +152,9 @@ export const gather = internalQuery({
     if (!table) return null;
     const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
     const names = new Map(members.map((m) => [m._id, m.displayName]));
-    const since = feast.createdAt - 7 * 86_400_000;
     const dumplings = await ctx.db
       .query("dumplings")
-      .withIndex("by_tableId_and_createdAt", (q) => q.eq("tableId", table._id).gte("createdAt", since))
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", addDays(feast.weekOf, -6)).lte("date", feast.weekOf))
       .take(80);
     const fillingOpen = new Map<Id<"fillings">, { open: boolean; date: string; prompt: string }>();
     const clips = [];

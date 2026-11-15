@@ -16,8 +16,8 @@ function formatWeek(weekOf: string) {
 }
 
 export default function Feast() {
-  const { token } = useSession();
-  const feasts = useQuery(api.feasts.list, token ? { token } : 'skip');
+  const { auth } = useSession();
+  const feasts = useQuery(api.feasts.list, auth ?? 'skip');
   const cook = useMutation(api.feasts.cook);
   const retry = useMutation(api.feasts.retry);
   const play = (id: Id<'feasts'>) => router.push({ pathname: '/player/[id]', params: { id } });
@@ -45,7 +45,11 @@ export default function Feast() {
           <Txt variant="hero" style={{ textAlign: 'center' }} testID="latest-feast-title">
             {latest.title}
           </Txt>
-          {latest.status === 'ready' && <Button testID="play-feast" big label="Play" onPress={() => play(latest.id)} />}
+          {latest.status === 'ready' && (
+            <View style={{ alignSelf: 'stretch' }}>
+              <Button testID="play-feast" big label="Play" onPress={() => play(latest.id)} />
+            </View>
+          )}
           {latest.status === 'cooking' && (
             <View style={styles.cooking}>
               <ActivityIndicator color={Palette.accent} />
@@ -55,7 +59,7 @@ export default function Feast() {
           {latest.status === 'failed' && (
             <>
               <Txt style={{ color: Palette.danger, textAlign: 'center' }}>{latest.error ?? 'Something burned.'}</Txt>
-              <Button label="Try again" onPress={() => token && void retry({ token, feastId: latest.id })} />
+              <Button label="Try again" onPress={() => auth && void retry({ ...auth, feastId: latest.id })} />
             </>
           )}
         </Card>
@@ -72,7 +76,7 @@ export default function Feast() {
         kind="secondary"
         label={cooking ? 'Cooking…' : 'Cook the Feast now'}
         disabled={cooking}
-        onPress={() => token && void cook({ token })}
+        onPress={() => auth && void cook({ ...auth })}
       />
 
       {leftovers.length > 0 && <Txt variant="label">Leftovers</Txt>}

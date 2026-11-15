@@ -2,32 +2,32 @@ import { useQuery } from 'convex/react';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { api } from '../../convex/_generated/api';
-import { loadToken, saveToken } from './storage';
+import { loadMembership, saveMembership, type Membership } from './storage';
 
 type Session = {
   ready: boolean;
-  token: string | null;
-  setToken: (token: string | null) => Promise<void>;
+  auth: Membership | null;
+  setAuth: (auth: Membership | null) => Promise<void>;
 };
 
-const SessionContext = createContext<Session>({ ready: false, token: null, setToken: async () => {} });
+const SessionContext = createContext<Session>({ ready: false, auth: null, setAuth: async () => {} });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
-  const [token, setTokenState] = useState<string | null>(null);
+  const [auth, setAuthState] = useState<Membership | null>(null);
 
   useEffect(() => {
-    loadToken()
-      .then(setTokenState)
+    loadMembership()
+      .then(setAuthState)
       .finally(() => setReady(true));
   }, []);
 
-  const setToken = useCallback(async (next: string | null) => {
-    await saveToken(next);
-    setTokenState(next);
+  const setAuth = useCallback(async (next: Membership | null) => {
+    await saveMembership(next);
+    setAuthState(next);
   }, []);
 
-  return <SessionContext.Provider value={{ ready, token, setToken }}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ ready, auth, setAuth }}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {
@@ -35,11 +35,11 @@ export function useSession() {
 }
 
 export function useMe() {
-  const { token, setToken } = useSession();
-  const me = useQuery(api.tables.me, token ? { token } : 'skip');
+  const { auth, setAuth } = useSession();
+  const me = useQuery(api.tables.me, auth ?? 'skip');
   useEffect(() => {
-    if (me === null) void setToken(null);
-  }, [me, setToken]);
+    if (me === null) void setAuth(null);
+  }, [me, setAuth]);
   return me ?? undefined;
 }
 

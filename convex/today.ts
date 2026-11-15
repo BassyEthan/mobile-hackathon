@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { FILLING_PROMPTS, dateInZone, isDate, isFillingOpen, requireMember } from "./lib";
+import { ensureFillingFor } from "./schedule";
+import { dateInZone, isDate, isFillingOpen, requireMember, sessionArgs } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -55,7 +56,7 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
 }
 
 export const get = query({
-  args: { token: v.string(), date: v.string() },
+  args: { ...sessionArgs, date: v.string() },
   returns: v.object({
     filling: v.union(v.null(), v.object({ id: v.id("fillings"), date: v.string(), prompt: v.string() })),
     members: v.array(v.object({ id: v.id("members"), displayName: v.string(), folded: v.boolean(), isMe: v.boolean() })),
@@ -63,7 +64,7 @@ export const get = query({
     dumplings: v.array(revealedDumpling),
   }),
   handler: async (ctx, args) => {
-    const { member, table } = await requireMember(ctx, args.token);
+    const { member, table } = await requireMember(ctx, args);
     const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
     const filling = isDate(args.date)
       ? await ctx.db
@@ -109,35 +110,10 @@ export const get = query({
 });
 
 export const ensureFilling = mutation({
-  args: { token: v.string() },
+  args: sessionArgs,
   returns: v.id("fillings"),
   handler: async (ctx, args) => {
-    const { table } = await requireMember(ctx, args.token);
-    const date = dateInZone(Date.now(), table.timeZone);
-    const existing = await ctx.db
-      .query("fillings")
-      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
-      .unique();
-    if (existing) return existing._id;
-    const latestFeast = await ctx.db
-      .query("feasts")
-      .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", table._id).lt("weekOf", date))
-      .order("desc")
-      .first();
-    if (latestFeast?.status === "ready" && latestFeast.secretIngredient && !latestFeast.nextFillingId) {
-      const fillingId = await ctx.db.insert("fillings", { tableId: table._id, date, prompt: latestFeast.secretIngredient });
-      await ctx.db.patch("feasts", latestFeast._id, { nextFillingId: fillingId });
-      return fillingId;
-    }
-    const previous = await ctx.db
-      .query("fillings")
-      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).lt("date", date))
-      .order("desc")
-      .take(FILLING_PROMPTS.length - 1);
-    const used = new Set(previous.map((f) => f.prompt));
-    const fresh = FILLING_PROMPTS.filter((p) => !used.has(p));
-    const pool = fresh.length > 0 ? fresh : FILLING_PROMPTS;
-    const index = Number(date.replaceAll("-", "")) % pool.length;
-    return await ctx.db.insert("fillings", { tableId: table._id, date, prompt: pool[index] });
+    const { table } = await requireMember(ctx, args);
+    return await ensureFillingFor(ctx, table, dateInZone(Date.now(), table.timeZone));
   },
 });
