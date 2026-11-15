@@ -3,7 +3,8 @@ import { internal } from "./_generated/api";
 import { mutation } from "./_generated/server";
 import { markToday } from "./schedule";
 import type { Id } from "./_generated/dataModel";
-import { canSeeDumpling, dateInZone, fillingHiddenFrom, requireMember, sessionArgs, sparksFor } from "./lib";
+import { canSeeDumpling, dateInZone, fillingHiddenFrom, foldedOn, requireMember, sessionArgs, sparksFor, tableMembers } from "./lib";
+import { notify } from "./notify";
 
 const MAX_BYTES = 80 * 1024 * 1024;
 
@@ -48,10 +49,9 @@ export const fold = mutation({
     } else if (args.sparkKey !== undefined) {
       throw new ConvexError("Pick one of today's sparks.");
     }
-    if (args.replyTo) {
-      const parent = await ctx.db.get("dumplings", args.replyTo);
-      if (!parent || !(await canSeeDumpling(ctx, member, parent))) throw new ConvexError("That clip is not open to you.");
-    }
+    const parent = args.replyTo ? await ctx.db.get("dumplings", args.replyTo) : null;
+    if (args.replyTo && (!parent || !(await canSeeDumpling(ctx, member, parent)))) throw new ConvexError("That clip is not open to you.");
+    const firstToday = !(await foldedOn(ctx, member._id, date));
     const file = await ctx.db.system.get("_storage", args.storageId);
     if (!file) throw new ConvexError("The upload did not arrive. Try again.");
     if (file.size > MAX_BYTES) {
@@ -71,6 +71,59 @@ export const fold = mutation({
       createdAt: now,
     });
     await ctx.scheduler.runAfter(0, internal.ai.processDumpling, { dumplingId });
+    const url = `/clip/${dumplingId}?date=${date}`;
+    if (parent && parent.memberId !== member._id) {
+      await notify(ctx, {
+        memberIds: [parent.memberId],
+        kind: `foldback:${member._id}`,
+        title: `${member.displayName} folded back to you`,
+        body: "Tap to watch their reply.",
+        url,
+      });
+    } else if (!parent && firstToday && !spark?.sealed) {
+      const others = (await tableMembers(ctx, table._id)).filter((m) => m._id !== member._id && !spark?.hiddenFrom?.includes(m._id));
+      await notify(ctx, {
+        memberIds: others.map((m) => m._id),
+        kind: `folded:${member._id}`,
+        title: `${member.displayName} just folded`,
+        body: "A new moment is in the Steamer.",
+        url,
+      });
+    }
     return dumplingId;
+  },
+});
+
+/** Only the person who folded a clip can take it back. Replies to it stay, as their own clips. */
+export const remove = mutation({
+  args: { ...sessionArgs, dumplingId: v.id("dumplings") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { member } = await requireMember(ctx, args);
+    const dumpling = await ctx.db.get("dumplings", args.dumplingId);
+    if (!dumpling || dumpling.memberId !== member._id) throw new ConvexError("Only you can delete your own clips.");
+    for await (const r of ctx.db.query("reactions").withIndex("by_dumplingId", (q) => q.eq("dumplingId", dumpling._id))) {
+      if (r.audioStorageId) await ctx.storage.delete(r.audioStorageId);
+      await ctx.db.delete("reactions", r._id);
+    }
+    for await (const child of ctx.db.query("dumplings").withIndex("by_replyTo", (q) => q.eq("replyTo", dumpling._id))) {
+      await ctx.db.patch("dumplings", child._id, { replyTo: undefined });
+    }
+    await ctx.storage.delete(dumpling.mediaStorageId);
+    await ctx.db.delete("dumplings", dumpling._id);
+    return null;
+  },
+});
+
+/** Owners decide whether their clip may be shared outside the Table from the Feast player. */
+export const setShare = mutation({
+  args: { ...sessionArgs, dumplingId: v.id("dumplings"), allowShare: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { member } = await requireMember(ctx, args);
+    const dumpling = await ctx.db.get("dumplings", args.dumplingId);
+    if (!dumpling || dumpling.memberId !== member._id) throw new ConvexError("Only you can change sharing for your clip.");
+    await ctx.db.patch("dumplings", dumpling._id, { allowShare: args.allowShare });
+    return null;
   },
 });

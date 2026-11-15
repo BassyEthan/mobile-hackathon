@@ -94,7 +94,7 @@ export const sundayFeasts = internalMutation({
     const now = Date.now();
     for (const table of page.page) {
       const date = dateInZone(now, table.timeZone);
-      if (weekOfFor(date) === date && localHour(now, table.timeZone) >= SUNDAY_COOK_HOUR) await startCook(ctx, table, now);
+      if (weekOfFor(date) === date && localHour(now, table.timeZone) >= Math.max(0, (table.feastHour ?? SUNDAY_COOK_HOUR + 1) - 1)) await startCook(ctx, table, now);
     }
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.schedule.sundayFeasts, { cursor: page.continueCursor });
     return null;

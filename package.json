@@ -16,8 +16,12 @@
     "expo-haptics": "~58.0.8",
     "expo-image": "~58.0.18",
     "expo-linking": "~58.0.17",
+    "expo-localization": "~58.0.5",
+    "expo-network": "~58.0.5",
+    "expo-notifications": "~58.1.9",
     "expo-router": "~58.0.31",
     "expo-secure-store": "~58.0.3",
+    "expo-speech": "~58.0.4",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-symbols": "~58.0.5",
@@ -52,7 +56,8 @@
     "dev": "convex dev",
     "seed": "node scripts/seed-demo.mjs",
     "smoke": "node --env-file=.env.local scripts/smoke-two-members.mjs",
-    "smoke:sparks": "node --env-file=.env.local scripts/smoke-sparks.mjs"
+    "smoke:sparks": "node --env-file=.env.local scripts/smoke-sparks.mjs",
+    "smoke:structure": "node --env-file=.env.local scripts/smoke-structure.mjs"
   },
   "private": true
 }

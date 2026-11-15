@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { ensureFillingFor, markToday } from "./schedule";
-import { canSeeDumpling, currentDay, dateInZone, fillingHiddenFrom, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, weekOfFor } from "./lib";
+import { addDays, canSeeDumpling, currentDay, dateInZone, fillingHiddenFrom, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, tableMembers, weekOfFor } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -22,6 +22,8 @@ export const revealedDumpling = v.object({
   spark: v.union(v.string(), v.null()),
   replyTo: v.union(v.id("dumplings"), v.null()),
   replyToName: v.union(v.string(), v.null()),
+  allowShare: v.boolean(),
+  sealed: v.boolean(),
   reactions: reactionSummary,
 });
 
@@ -59,11 +61,13 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
     spark: dumpling.hiddenFrom?.includes(viewer._id) ? null : (dumpling.sparkText ?? null),
     replyTo: parent?._id ?? null,
     replyToName: parent ? (parentAuthor?.displayName ?? "Someone") : null,
+    allowShare: dumpling.allowShare ?? false,
+    sealed: dumpling.sealed ?? false,
     reactions: { counts, mine, voices },
   };
 }
 
-function tableWeek(table: Doc<"tables">, date: string) {
+export function tableWeek(table: Doc<"tables">, date: string) {
   const first = weekOfFor(dateInZone(table.createdAt, table.timeZone));
   const days = Math.round((Date.parse(`${weekOfFor(date)}T12:00:00Z`) - Date.parse(`${first}T12:00:00Z`)) / 86_400_000);
   return Math.max(1, Math.floor(days / 7) + 1);
@@ -91,7 +95,7 @@ export const get = query({
   handler: async (ctx, args) => {
     const { member, table } = await requireMember(ctx, args);
     const date = isDate(args.date) ? args.date : dateInZone(table.createdAt, table.timeZone);
-    const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
+    const members = await tableMembers(ctx, table._id);
     const today = await currentDay(ctx, table);
     const found = today !== null && date <= today
       ? await ctx.db
@@ -145,5 +149,46 @@ export const ensureFilling = mutation({
   handler: async (ctx, args) => {
     const { table } = await requireMember(ctx, args);
     return await ensureFillingFor(ctx, table, await markToday(ctx, table, Date.now()));
+  },
+});
+
+/** The day strip: the last seven days, with how many clips each holds and whether you folded. */
+export const week = query({
+  args: { ...sessionArgs, date: v.string() },
+  returns: v.array(v.object({ date: v.string(), clips: v.number(), mine: v.boolean() })),
+  handler: async (ctx, args) => {
+    const { member, table } = await requireMember(ctx, args);
+    if (!isDate(args.date)) return [];
+    const from = addDays(args.date, -6);
+    const rows = await ctx.db
+      .query("dumplings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", from).lte("date", args.date))
+      .take(400);
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(from, i);
+      const day = rows.filter((d) => d.date === date);
+      return { date, clips: day.length, mine: day.some((d) => d.memberId === member._id) };
+    });
+  },
+});
+
+/** Questions a family member asked you directly, so "Maya asked you something" opens the actual question. */
+export const asksForMe = query({
+  args: sessionArgs,
+  returns: v.array(v.object({ id: v.id("askQueue"), authorName: v.string(), text: v.string(), createdAt: v.number() })),
+  handler: async (ctx, args) => {
+    const { member, table } = await requireMember(ctx, args);
+    const pending = await ctx.db
+      .query("askQueue")
+      .withIndex("by_tableId_and_usedOn", (q) => q.eq("tableId", table._id).eq("usedOn", undefined))
+      .order("desc")
+      .take(30);
+    const rows = [];
+    for (const a of pending) {
+      if (a.addressedTo !== member._id) continue;
+      const author = await ctx.db.get("members", a.authorId);
+      rows.push({ id: a._id, authorName: author?.displayName ?? "Someone", text: a.text, createdAt: a.createdAt });
+    }
+    return rows.slice(0, 3);
   },
 });

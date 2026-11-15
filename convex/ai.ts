@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { outputText } from "./chef";
+import { tableMembers } from "./lib";
 
 const TRANSCRIBE_MODEL = "gpt-transcribe";
 const TRANSLATE_MODEL = "gpt-6-luna";
@@ -12,7 +13,7 @@ export const forDumpling = internalQuery({
   handler: async (ctx, args) => {
     const dumpling = await ctx.db.get("dumplings", args.dumplingId);
     if (!dumpling) return null;
-    const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", dumpling.tableId)).take(50);
+    const members = await tableMembers(ctx, dumpling.tableId, { guests: true });
     return { storageId: dumpling.mediaStorageId, languages: [...new Set(members.map((m) => m.language))] };
   },
 });

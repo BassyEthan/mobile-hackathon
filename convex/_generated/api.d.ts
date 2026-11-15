@@ -16,6 +16,8 @@ import type * as crons from "../crons.js";
 import type * as dumplings from "../dumplings.js";
 import type * as feasts from "../feasts.js";
 import type * as lib from "../lib.js";
+import type * as members from "../members.js";
+import type * as notify from "../notify.js";
 import type * as reactions from "../reactions.js";
 import type * as schedule from "../schedule.js";
 import type * as seed from "../seed.js";
@@ -38,6 +40,8 @@ declare const fullApi: ApiFromModules<{
   dumplings: typeof dumplings;
   feasts: typeof feasts;
   lib: typeof lib;
+  members: typeof members;
+  notify: typeof notify;
   reactions: typeof reactions;
   schedule: typeof schedule;
   seed: typeof seed;

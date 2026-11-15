@@ -51,3 +51,33 @@ export async function saveMembership(membership: Membership | null) {
     else if (file.exists) file.delete();
   }
 }
+
+/** Small JSON values that are not secrets (seen markers, the host's setup progress, the upload outbox). */
+function valueFile(key: string) {
+  return new File(Paths.document, `dumpling-${key}.json`);
+}
+
+export async function loadValue<T>(key: string): Promise<T | null> {
+  try {
+    const raw = Platform.OS === 'web' ? globalThis.localStorage?.getItem(`dumpling.${key}`) : valueFile(key).exists ? await valueFile(key).text() : null;
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveValue(key: string, value: unknown) {
+  try {
+    if (Platform.OS === 'web') {
+      if (value === null) globalThis.localStorage?.removeItem(`dumpling.${key}`);
+      else globalThis.localStorage?.setItem(`dumpling.${key}`, JSON.stringify(value));
+      return;
+    }
+    const file = valueFile(key);
+    if (value === null) {
+      if (file.exists) file.delete();
+    } else file.write(JSON.stringify(value));
+  } catch {
+    // Storage is a convenience; the app keeps working in memory.
+  }
+}

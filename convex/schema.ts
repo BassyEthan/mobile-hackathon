@@ -47,15 +47,42 @@ export default defineSchema({
     timeZone: v.string(),
     createdAt: v.number(),
     today: v.optional(v.string()),
+    // Local hour on Sunday when the Feast is served (set during host onboarding).
+    feastHour: v.optional(v.number()),
+    // Languages the family speaks, used for captions.
+    languages: v.optional(v.array(v.string())),
+    intake: v.optional(
+      v.object({
+        who: v.array(v.string()),
+        distance: v.optional(v.string()),
+        lastTogether: v.optional(v.string()),
+        missMost: v.optional(v.string()),
+      }),
+    ),
   }).index("by_joinCode", ["joinCode"]),
   members: defineTable({
     tableId: v.id("tables"),
     displayName: v.string(),
     language: v.string(),
-    role: v.union(v.literal("host"), v.literal("member")),
+    role: v.union(v.literal("host"), v.literal("member"), v.literal("guest")),
     tokenHash: v.string(),
     birthday: v.optional(v.object({ month: v.number(), day: v.number() })),
     isElder: v.optional(v.boolean()),
+    nickname: v.optional(v.string()),
+    motherTongue: v.optional(v.string()),
+    wishLanguage: v.optional(v.string()),
+    spokenLanguages: v.optional(v.array(v.string())),
+    missMost: v.optional(v.string()),
+    sundayTime: v.optional(v.string()),
+    // Reflective Today cards the member answered or dismissed.
+    prompted: v.optional(v.array(v.string())),
+    voiceOnly: v.optional(v.boolean()),
+    // Earliest local hour a notification may arrive.
+    notifyFrom: v.optional(v.number()),
+    pushToken: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    invitedBy: v.optional(v.id("members")),
+    leftAt: v.optional(v.number()),
   })
     .index("by_tableId", ["tableId"])
     .index("by_tokenHash", ["tokenHash"]),
@@ -100,13 +127,15 @@ export default defineSchema({
     transcript: v.optional(v.string()),
     language: v.optional(v.string()),
     translation: v.optional(v.record(v.string(), v.string())),
+    allowShare: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_fillingId_and_memberId", ["fillingId", "memberId"])
     .index("by_tableId_and_createdAt", ["tableId", "createdAt"])
     .index("by_tableId_and_date", ["tableId", "date"])
     .index("by_memberId_and_date", ["memberId", "date"])
-    .index("by_replyTo", ["replyTo"]),
+    .index("by_replyTo", ["replyTo"])
+    .index("by_memberId_and_createdAt", ["memberId", "createdAt"]),
   askQueue: defineTable({
     tableId: v.id("tables"),
     authorId: v.id("members"),
@@ -124,7 +153,9 @@ export default defineSchema({
     kind: v.string(),
     audioStorageId: v.optional(v.id("_storage")),
     createdAt: v.number(),
-  }).index("by_dumplingId", ["dumplingId"]),
+  })
+    .index("by_dumplingId", ["dumplingId"])
+    .index("by_memberId", ["memberId"]),
   feasts: defineTable({
     tableId: v.id("tables"),
     weekOf: v.string(),
@@ -134,6 +165,21 @@ export default defineSchema({
     error: v.optional(v.string()),
     secretIngredient: v.optional(v.string()),
     nextFillingId: v.optional(v.id("fillings")),
+    kind: v.optional(v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion"))),
     createdAt: v.number(),
   }).index("by_tableId_and_weekOf", ["tableId", "weekOf"]),
+  phraseAttempts: defineTable({
+    memberId: v.id("members"),
+    feastId: v.id("feasts"),
+    phrase: v.string(),
+    meaning: v.optional(v.string()),
+    storageId: v.id("_storage"),
+    createdAt: v.number(),
+  }).index("by_memberId_and_createdAt", ["memberId", "createdAt"]),
+  notifications: defineTable({
+    memberId: v.id("members"),
+    date: v.string(),
+    kind: v.string(),
+    createdAt: v.number(),
+  }).index("by_memberId_and_date", ["memberId", "date"]),
 });

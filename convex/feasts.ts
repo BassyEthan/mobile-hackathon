@@ -2,9 +2,10 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { segment } from "./schema";
-import { addDays, canSeeDumpling, isDayOpen, seatLine, requireMember, sessionArgs } from "./lib";
+import { addDays, canSeeDumpling, dateInZone, isDate, isDayOpen, seatLine, requireMember, sessionArgs, tableMembers, weekOfFor } from "./lib";
+import { notify } from "./notify";
 import { startCook } from "./schedule";
-import { describeDumpling, revealedDumpling } from "./today";
+import { describeDumpling, revealedDumpling, tableWeek } from "./today";
 
 const feastSummary = v.object({
   id: v.id("feasts"),
@@ -13,6 +14,10 @@ const feastSummary = v.object({
   status: v.union(v.literal("cooking"), v.literal("ready"), v.literal("failed")),
   error: v.union(v.string(), v.null()),
   segmentCount: v.number(),
+  weekNumber: v.number(),
+  kind: v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion")),
+  isPilot: v.boolean(),
+  createdAt: v.number(),
 });
 
 export const list = query({
@@ -24,7 +29,8 @@ export const list = query({
       .query("feasts")
       .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", table._id))
       .order("desc")
-      .take(8);
+      .take(104);
+    const first = feasts[feasts.length - 1]?._id;
     return feasts.map((f) => ({
       id: f._id,
       title: f.title,
@@ -32,6 +38,10 @@ export const list = query({
       status: f.status,
       error: f.error ?? null,
       segmentCount: f.segments.length,
+      weekNumber: tableWeek(table, f.weekOf),
+      kind: f.kind ?? "weekly",
+      isPilot: f._id === first && feasts.length < 104,
+      createdAt: f.createdAt,
     }));
   },
 });
@@ -55,7 +65,14 @@ export const get = query({
   args: { ...sessionArgs, feastId: v.id("feasts") },
   returns: v.union(
     v.null(),
-    v.object({ title: v.string(), chefName: v.string(), status: v.string(), segments: v.array(playableSegment) }),
+    v.object({
+      title: v.string(),
+      chefName: v.string(),
+      status: v.string(),
+      weekOf: v.string(),
+      weekNumber: v.number(),
+      segments: v.array(playableSegment),
+    }),
   ),
   handler: async (ctx, args) => {
     const { member, table } = await requireMember(ctx, args);
@@ -91,7 +108,7 @@ export const get = query({
         segments.push({ type: s.type, prompt: s.prompt, text: s.translations?.[member.language] ?? s.text });
       }
     }
-    return { title: feast.title, chefName: table.chefName, status: feast.status, segments };
+    return { title: feast.title, chefName: table.chefName, status: feast.status, weekOf: feast.weekOf, weekNumber: tableWeek(table, feast.weekOf), segments };
   },
 });
 
@@ -153,7 +170,8 @@ export const gather = internalQuery({
     if (!feast) return null;
     const table = await ctx.db.get("tables", feast.tableId);
     if (!table) return null;
-    const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
+    // Guests watch by link and never fold, so the Chef never sees them (their caption language is their inviter's).
+    const members = await tableMembers(ctx, table._id);
     const names = new Map(members.map((m) => [m._id, m.displayName]));
     const dumplings = await ctx.db
       .query("dumplings")
@@ -216,6 +234,17 @@ export const finish = internalMutation({
       status: "ready",
       error: undefined,
     });
+    const feast = await ctx.db.get("feasts", args.feastId);
+    if (feast) {
+      const members = await tableMembers(ctx, feast.tableId);
+      await notify(ctx, {
+        memberIds: members.map((m) => m._id),
+        kind: "feast",
+        title: "The Feast is served",
+        body: args.title,
+        url: `/player/${args.feastId}`,
+      });
+    }
     return null;
   },
 });
@@ -226,5 +255,43 @@ export const fail = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch("feasts", args.feastId, { status: "failed", error: args.error, title: "The Feast burned" });
     return null;
+  },
+});
+
+/** What the Feast tab shows before Sunday: how many sealed clips are waiting and how full the week is. */
+export const upcoming = query({
+  args: { ...sessionArgs, date: v.string() },
+  returns: v.object({ weekOf: v.string(), sealedWaiting: v.number(), clipsThisWeek: v.number(), feastHour: v.number() }),
+  handler: async (ctx, args) => {
+    const { table } = await requireMember(ctx, args);
+    const date = isDate(args.date) ? args.date : (table.today ?? dateInZone(table.createdAt, table.timeZone));
+    const weekOf = weekOfFor(date);
+    const rows = await ctx.db
+      .query("dumplings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", addDays(weekOf, -6)).lte("date", weekOf))
+      .take(400);
+    return { weekOf, sealedWaiting: rows.filter((d) => d.sealed).length, clipsThisWeek: rows.length, feastHour: table.feastHour ?? 18 };
+  },
+});
+
+/** From the Freezer: one clip from at least four weeks ago, chosen fresh each day. */
+export const freezer = query({
+  args: { ...sessionArgs, date: v.string() },
+  returns: v.union(v.null(), v.object({ dumpling: revealedDumpling, date: v.string() })),
+  handler: async (ctx, args) => {
+    const { member, table } = await requireMember(ctx, args);
+    if (!isDate(args.date)) return null;
+    const old = await ctx.db
+      .query("dumplings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).lt("date", addDays(args.date, -28)))
+      .order("desc")
+      .take(60);
+    const visible = [];
+    for (const d of old) {
+      if (!d.replyTo && d.date && (await canSeeDumpling(ctx, member, d, { inFeast: true }))) visible.push(d);
+    }
+    if (visible.length === 0) return null;
+    const pick = visible[Number(args.date.replaceAll("-", "")) % visible.length];
+    return { dumpling: await describeDumpling(ctx, member, pick), date: pick.date ?? args.date };
   },
 });

@@ -1,5 +1,101 @@
-import { Sun, Clapperboard, Settings2, Video, Sparkles, UsersRound, Heart, Mic, CornerUpLeft, SkipForward, SkipBack, X, Play, Pause, RotateCcw, ArrowRight, ChevronRight, Shuffle, Send, LockKeyhole, Volume2, Check, Camera, Square, type LucideIcon } from 'lucide-react-native';
-import { Palette } from '@/constants/dumpling';
-const icons = { sun: Sun, feast: Clapperboard, settings: Settings2, video: Video, spark: Sparkles, family: UsersRound, heart: Heart, mic: Mic, reply: CornerUpLeft, next: SkipForward, previous: SkipBack, close: X, play: Play, pause: Pause, replay: RotateCcw, arrow: ArrowRight, chevron: ChevronRight, shuffle: Shuffle, send: Send, lock: LockKeyhole, volume: Volume2, check: Check, camera: Camera, stop: Square } satisfies Record<string, LucideIcon>;
+import {
+  ArrowRight,
+  AudioLines,
+  Award,
+  Bell,
+  Cake,
+  Camera,
+  Captions,
+  CaptionsOff,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clapperboard,
+  Clock,
+  CornerUpLeft,
+  Ellipsis,
+  Heart,
+  Languages,
+  LockKeyhole,
+  MessageCircleQuestion,
+  Mic,
+  Pause,
+  Phone,
+  Play,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Send,
+  Settings2,
+  Share,
+  Shuffle,
+  Snowflake,
+  Sparkles,
+  Square,
+  Sun,
+  Trash2,
+  UserRound,
+  UsersRound,
+  Video,
+  Volume2,
+  WifiOff,
+  X,
+  type LucideIcon,
+} from 'lucide-react-native';
+
+import { Color } from '@/constants/dumpling';
+
+/**
+ * One icon family (Lucide), one stroke weight. Emoji never stand in for functional icons; they appear only as the
+ * content of a reaction. The dumpling mascot is a brand illustration and lives in mascot.tsx, not here.
+ */
+const icons = {
+  today: Sun,
+  feast: Clapperboard,
+  settings: Settings2,
+  video: Video,
+  camera: Camera,
+  spark: Sparkles,
+  family: UsersRound,
+  person: UserRound,
+  heart: Heart,
+  mic: Mic,
+  voice: AudioLines,
+  reply: CornerUpLeft,
+  close: X,
+  play: Play,
+  pause: Pause,
+  replay: RotateCcw,
+  retry: RefreshCw,
+  arrow: ArrowRight,
+  chevron: ChevronRight,
+  back: ChevronLeft,
+  shuffle: Shuffle,
+  send: Send,
+  lock: LockKeyhole,
+  volume: Volume2,
+  check: Check,
+  stop: Square,
+  plus: Plus,
+  more: Ellipsis,
+  trash: Trash2,
+  share: Share,
+  captions: Captions,
+  captionsOff: CaptionsOff,
+  phone: Phone,
+  bell: Bell,
+  language: Languages,
+  cake: Cake,
+  clock: Clock,
+  offline: WifiOff,
+  award: Award,
+  ask: MessageCircleQuestion,
+  freezer: Snowflake,
+} satisfies Record<string, LucideIcon>;
+
 export type IconName = keyof typeof icons;
-export function Icon({ name, size = 22, color = Palette.ink }: { name: IconName; size?: number; color?: string }) { const Component = icons[name]; return <Component size={size} color={color} strokeWidth={1.8} />; }
+
+export function Icon({ name, size = 22, color = Color.text, fill }: { name: IconName; size?: number; color?: string; fill?: string }) {
+  const Component = icons[name];
+  return <Component size={size} color={color} strokeWidth={size >= 26 ? 1.75 : 1.9} fill={fill ?? 'none'} />;
+}

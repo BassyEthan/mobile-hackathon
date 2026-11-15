@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { dateInZone, isDate, requireMember, sessionArgs, weekOfFor } from "./lib";
+import { notify } from "./notify";
 
 export const ASK_MAX_LENGTH = 140;
 
@@ -37,7 +38,7 @@ export const submit = mutation({
       .withIndex("by_authorId_and_weekOf", (q) => q.eq("authorId", member._id).eq("weekOf", weekOf))
       .first();
     if (existing) throw new ConvexError("You already asked this week. Ask again next week.");
-    return await ctx.db.insert("askQueue", {
+    const askId = await ctx.db.insert("askQueue", {
       tableId: table._id,
       authorId: member._id,
       text,
@@ -45,5 +46,15 @@ export const submit = mutation({
       weekOf,
       createdAt: now,
     });
+    if (args.addressedTo) {
+      await notify(ctx, {
+        memberIds: [args.addressedTo],
+        kind: `asked:${member._id}`,
+        title: `${member.displayName} asked you something`,
+        body: text,
+        url: `/?ask=${askId}`,
+      });
+    }
+    return askId;
   },
 });

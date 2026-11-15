@@ -1,11 +1,11 @@
 import { useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Button, Chip, Txt } from '@/components/ui';
 import { Sheet } from '@/components/sheet';
-import { Palette, Radius, Type } from '@/constants/dumpling';
+import { Button, Chip, Field, Txt } from '@/components/ui';
+import { Color } from '@/constants/dumpling';
 import { useSession } from '@/lib/session';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -14,78 +14,91 @@ const MAX_LENGTH = 140;
 
 type Member = { id: Id<'members'>; displayName: string; isMe: boolean };
 
-export function AskTheTable({ date, members }: { date: string; members: Member[] }) {
+/**
+ * One question a week, for everyone or for one person. The Chef turns it into a future spark; when it is addressed to
+ * someone, they hear about it straight away.
+ */
+type Props = { visible: boolean; onClose: () => void; date: string; members: Member[]; to?: Id<'members'> | null };
+
+export function AskSheet(props: Props) {
+  const target = props.members.find((m) => !m.isMe && m.id === props.to);
+  return (
+    <Sheet visible={props.visible} title={target ? `Ask ${target.displayName}` : 'Ask the Table'} onClose={props.onClose}>
+      {/* The form mounts fresh each time the sheet opens, so it always starts clean. */}
+      {props.visible && <AskForm {...props} />}
+    </Sheet>
+  );
+}
+
+function AskForm({ onClose, date, members, to: initialTo }: Props) {
   const { auth } = useSession();
   const status = useQuery(api.asks.status, auth ? { ...auth, date } : 'skip');
   const submit = useMutation(api.asks.submit);
-  const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [to, setTo] = useState<Id<'members'> | null>(null);
+  const [to, setTo] = useState<Id<'members'> | null>(initialTo ?? null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!auth || !status) return null;
-  if (status.askedThisWeek) {
-    return <Txt variant="small" testID="ask-sent">Your question is with the Chef this week.</Txt>;
-  }
+  const others = members.filter((m) => !m.isMe);
+  const target = others.find((m) => m.id === to);
 
   const send = async () => {
+    if (!auth) return;
     setBusy(true);
     setError(null);
     try {
       await submit({ ...auth, text, ...(to ? { addressedTo: to } : {}) });
-      setOpen(false);
+      setText('');
+      setSent(true);
     } catch (e) {
-      setError(e instanceof ConvexError ? String(e.data) : 'That did not send. Try again.');
+      setError(e instanceof ConvexError ? String(e.data) : 'That did not send. Check your connection and try again.');
     } finally {
       setBusy(false);
     }
   };
 
-  const others = members.filter((m) => !m.isMe);
   return (
     <>
-    <Button testID="ask-the-table" icon="family" kind="quiet" label="Ask the Table" onPress={() => setOpen(true)} />
-    <Sheet visible={open} title="Ask the Table" onClose={() => setOpen(false)}>
-      <Txt variant="small">A little curiosity brings everyone closer. Send one question a week for a future spark.</Txt>
-      <TextInput
-        accessibilityLabel="Your question"
-        testID="ask-text"
-        value={text}
-        onChangeText={(t) => setText(t.slice(0, MAX_LENGTH))}
-        placeholder="What do you want to hear about?"
-        placeholderTextColor={Palette.inkSoft}
-        maxLength={MAX_LENGTH}
-        multiline
-        style={styles.input}
-      />
-      {others.length > 0 && (
-        <View style={styles.row}>
-          <Chip label="Everyone" selected={to === null} onPress={() => setTo(null)} />
-          {others.map((m) => (
-            <Chip key={m.id} label={m.displayName} selected={to === m.id} onPress={() => setTo(m.id)} />
-          ))}
+      {sent ? (
+        <View style={{ gap: 16 }}>
+          <Txt>{target ? `${target.displayName} will see your question.` : 'Your question is with the Chef.'} It may become a spark later this week.</Txt>
+          <Button label="Done" onPress={onClose} />
         </View>
+      ) : status?.askedThisWeek ? (
+        <View style={{ gap: 16 }}>
+          <Txt>You have asked your question for this week. You can ask again on Monday.</Txt>
+          <Button kind="secondary" label="Close" onPress={onClose} />
+        </View>
+      ) : (
+        <>
+          <Txt variant="meta">One question a week. The Chef may use it as a spark for the family.</Txt>
+          <Field
+            accessibilityLabel="Your question"
+            testID="ask-text"
+            value={text}
+            onChangeText={(t) => setText(t.slice(0, MAX_LENGTH))}
+            placeholder={target ? `What would you like to ask ${target.displayName}?` : 'What do you want to hear about?'}
+            maxLength={MAX_LENGTH}
+            multiline
+          />
+          {others.length > 0 && (
+            <View style={{ gap: 8 }}>
+              <Txt variant="meta">Ask</Txt>
+              <View style={styles.row}>
+                <Chip label="Everyone" selected={to === null} onPress={() => setTo(null)} />
+                {others.map((m) => (
+                  <Chip key={m.id} label={m.displayName} selected={to === m.id} onPress={() => setTo(m.id)} />
+                ))}
+              </View>
+            </View>
+          )}
+          {error && <Txt variant="meta" style={{ color: Color.danger }}>{error}</Txt>}
+          <Button testID="ask-send" icon="send" label="Send question" busy={busy} disabled={text.trim().length < 3} onPress={() => void send()} />
+        </>
       )}
-      {error && <Txt style={{ color: Palette.danger }}>{error}</Txt>}
-      <Button testID="ask-send" icon="send" label="Send to the Chef" busy={busy} disabled={text.trim().length < 3} onPress={() => void send()} />
-    </Sheet>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  input: {
-    minHeight: 80,
-    borderRadius: Radius.chip,
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.creamDeep,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    fontSize: Type.body,
-    color: Palette.ink,
-    fontFamily: Type.family,
-  },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-});
+const styles = StyleSheet.create({ row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 } });

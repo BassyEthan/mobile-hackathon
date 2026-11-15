@@ -5,7 +5,7 @@ import { action, internalAction, internalMutation, internalQuery } from "./_gene
 import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { callbacks, openai, outputText } from "./chef";
-import { addDays, dateInZone, fallbackFilling, findMember, isDate, localHour, sessionArgs, weekOfFor } from "./lib";
+import { addDays, dateInZone, fallbackFilling, findMember, isDate, localHour, sessionArgs, tableMembers, weekOfFor } from "./lib";
 import { pendingSecretIngredient } from "./schedule";
 
 const TEXT_MODEL = "gpt-6.1-terra";
@@ -63,7 +63,7 @@ export const context = internalQuery({
   handler: async (ctx, args) => {
     const table = await ctx.db.get("tables", args.tableId);
     if (!table || !isDate(args.date)) return null;
-    const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
+    const members = await tableMembers(ctx, table._id);
     const names = new Map(members.map((m) => [m._id, m.displayName]));
     const days = (from: string) => Math.round((Date.parse(`${args.date}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
     const memberInfo = [];

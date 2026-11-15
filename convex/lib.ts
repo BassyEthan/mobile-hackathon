@@ -52,7 +52,7 @@ export async function findMember(ctx: QueryCtx, session: Session) {
     .query("members")
     .withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
     .unique();
-  if (!member || member._id !== session.memberId) return null;
+  if (!member || member._id !== session.memberId || member.leftAt) return null;
   const table = await ctx.db.get("tables", member.tableId);
   if (!table) return null;
   return { member, table };
@@ -63,6 +63,14 @@ export async function requireMember(ctx: QueryCtx, args: Session) {
   if (!session) throw new ConvexError("Your seat at this Table has expired. Join again.");
   return session;
 }
+
+/** Everyone currently seated at a Table. Guests watch the Feast by link and are left out unless asked for. */
+export async function tableMembers(ctx: QueryCtx, tableId: Id<"tables">, options: { guests?: boolean } = {}) {
+  const rows = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", tableId)).take(60);
+  return rows.filter((m) => !m.leftAt && (options.guests || m.role !== "guest"));
+}
+
+export const FEAST_HOURS = { morning: 10, afternoon: 15, evening: 18 } as const;
 
 export const SPARK_TYPES = ["show", "tell", "ask", "together", "sealed"] as const;
 export type SparkType = (typeof SPARK_TYPES)[number];
