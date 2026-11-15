@@ -2,7 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, Share, StyleSheet, View } from 'react-native';
 
 import { Mascot } from '@/components/mascot';
 import { Steamer } from '@/components/steamer';
@@ -39,6 +39,20 @@ export default function Today() {
   }
 
   const iFolded = today.members.some((m) => m.isMe && m.folded);
+  const days = date ? (7 - new Date(`${date}T12:00:00Z`).getUTCDay()) % 7 : null;
+  const countdown = days === 0 ? 'Feast day' : days === 1 ? 'Feast tomorrow' : `Feast in ${days} days`;
+  const streak = today.streak ?? 0;
+  const canShare = Platform.OS !== 'web' || (typeof navigator !== 'undefined' && typeof navigator.share === 'function');
+  const invite = `Join ${me.tableName} in Dumpling with Table code ${me.joinCode}.`;
+
+  const shareCode = async () => {
+    try {
+      if (Platform.OS === 'web') await navigator.share({ text: invite });
+      else await Share.share({ message: invite });
+    } catch {
+      // The selectable code stays visible if sharing is dismissed or unavailable.
+    }
+  };
 
   return (
     <Screen bottomInset={BottomTabInset}>
@@ -48,6 +62,23 @@ export default function Today() {
           <Txt variant="label">{me.tableName}</Txt>
           <Txt variant="title">Hi, {me.displayName}</Txt>
         </View>
+      </View>
+
+      {today.members.length === 1 && (
+        <Card>
+          <Txt variant="label">Invite your family</Txt>
+          <Txt variant="title" selectable>{me.joinCode}</Txt>
+          {canShare && (
+            <Button kind="secondary" label="Share Table code" onPress={() => void shareCode()} />
+          )}
+        </Card>
+      )}
+
+      <View style={styles.tableStats}>
+        {days !== null && <Txt variant="small" testID="feast-countdown">{countdown}</Txt>}
+        <Txt variant="small" testID="table-streak">
+          {streak > 0 ? `Table streak · ${streak} ${streak === 1 ? 'week' : 'weeks'}` : 'Your first Feast starts the Table streak.'}
+        </Txt>
       </View>
 
       <Card style={styles.filling}>
@@ -65,7 +96,7 @@ export default function Today() {
         <Button
           testID="fold-button"
           big
-          label="Fold"
+          label="Fold a Dumpling"
           disabled={!today.filling}
           onPress={() => {
             if (!today.filling) return;
@@ -76,6 +107,13 @@ export default function Today() {
       )}
 
       <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
+
+      {today.members.length > 1 && (
+        <Card>
+          <Txt variant="small" selectable>Table code {me.joinCode}</Txt>
+          {canShare && <Button kind="secondary" label="Share Table code" onPress={() => void shareCode()} />}
+        </Card>
+      )}
     </Screen>
   );
 }
@@ -84,5 +122,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   filling: { backgroundColor: Palette.creamDeep, paddingVertical: 28 },
+  tableStats: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   centerText: { textAlign: 'center' },
 });

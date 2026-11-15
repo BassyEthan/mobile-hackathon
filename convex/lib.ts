@@ -97,8 +97,12 @@ export async function hasFolded(ctx: QueryCtx, member: Doc<"members">, fillingId
 
 export async function canSeeDumpling(ctx: QueryCtx, member: Doc<"members">, dumpling: Doc<"dumplings">) {
   if (dumpling.tableId !== member.tableId) return false;
-  if (dumpling.memberId === member._id) return true;
-  if (await hasFolded(ctx, member, dumpling.fillingId)) return true;
   const filling = await ctx.db.get("fillings", dumpling.fillingId);
-  return filling !== null && !(await isFillingOpen(ctx, filling));
+  if (!filling) return false;
+  if (!(await isFillingOpen(ctx, filling))) return true;
+  const members = await ctx.db.query("members")
+    .withIndex("by_tableId", (q) => q.eq("tableId", member.tableId)).take(2);
+  return members.length > 1 && (
+    dumpling.memberId === member._id || await hasFolded(ctx, member, dumpling.fillingId)
+  );
 }

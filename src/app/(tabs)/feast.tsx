@@ -67,7 +67,7 @@ export default function Feast() {
         <Card style={styles.hero}>
           <Mascot size={96} />
           <Txt variant="title">No Feast yet</Txt>
-          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Fold through the week and the Chef serves it on Sunday.</Txt>
+          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Try a Pilot with Cook the Feast now, or fold through the week for Sunday.</Txt>
         </Card>
       )}
 

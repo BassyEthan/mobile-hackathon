@@ -26,6 +26,7 @@ export function Txt({
   style?: StyleProp<TextStyle>;
   testID?: string;
   numberOfLines?: number;
+  selectable?: boolean;
 }) {
   return (
     <Text style={[styles.text, styles[variant], style]} {...rest}>

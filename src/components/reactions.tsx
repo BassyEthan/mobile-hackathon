@@ -1,7 +1,7 @@
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { useMutation } from 'convex/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Palette, Radius, Type } from '@/constants/dumpling';
@@ -46,11 +46,20 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const generateUploadUrl = useMutation(api.dumplings.generateUploadUrl);
   const sendVoice = useMutation(api.reactions.voice);
-  const [state, setState] = useState<'idle' | 'recording' | 'sending' | 'failed'>('idle');
+  const [state, setState] = useState<'idle' | 'starting' | 'recording' | 'holding' | 'sending' | 'failed'>('idle');
+  const phase = useRef<'idle' | 'starting' | 'recording' | 'sending'>('idle');
+  const held = useRef(false);
+  const holdToRecord = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
 
   const stopAndSend = async () => {
+    if (phase.current !== 'recording') return;
+    phase.current = 'sending';
     if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     setState('sending');
     try {
       await recorder.stop();
@@ -61,32 +70,68 @@ function VoiceButton({ dumplingId }: { dumplingId: Id<'dumplings'> }) {
       setState('idle');
     } catch {
       setState('failed');
+    } finally {
+      phase.current = 'idle';
     }
   };
 
-  const start = async () => {
-    const permission = await requestRecordingPermissionsAsync();
-    if (!permission.granted) {
+  const start = async (hold: boolean) => {
+    if (phase.current !== 'idle') return;
+    phase.current = 'starting';
+    holdToRecord.current = hold;
+    setState('starting');
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) throw new Error('Microphone permission denied');
+      if (hold && !held.current) {
+        phase.current = 'idle';
+        setState('idle');
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      if (hold && !held.current) {
+        await recorder.stop();
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+        phase.current = 'idle';
+        setState('idle');
+        return;
+      }
+      recorder.record();
+      phase.current = 'recording';
+      setState(hold ? 'holding' : 'recording');
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      timer.current = setTimeout(() => void stopAndSend(), 5000);
+    } catch {
+      phase.current = 'idle';
       setState('failed');
-      return;
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     }
-    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-    await recorder.prepareToRecordAsync();
-    recorder.record();
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setState('recording');
-    timer.current = setTimeout(() => void stopAndSend(), 5000);
   };
 
-  const label = { idle: '🎙 Voice', recording: '■ Send', sending: 'Sending…', failed: '🎙 Retry' }[state];
+  const label = {
+    idle: '🎙 Hold to react',
+    starting: 'Getting ready…',
+    recording: '■ Send',
+    holding: 'Release to send',
+    sending: 'Sending…',
+    failed: '🎙 Retry',
+  }[state];
+  const recording = state === 'recording' || state === 'holding';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={state === 'recording' ? 'Stop and send voice reaction' : 'Record a voice reaction'}
+      accessibilityLabel={recording ? 'Stop and send voice reaction' : 'Record a voice reaction'}
       disabled={state === 'sending'}
-      onPress={() => void (state === 'recording' ? stopAndSend() : start())}
-      style={({ pressed }) => [styles.tap, state === 'recording' && styles.recording, pressed && { opacity: 0.7 }]}>
-      <Text style={[styles.tapText, state === 'recording' && { color: Palette.cream }]}>{label}</Text>
+      onPressIn={() => { held.current = true; }}
+      onLongPress={() => void start(true)}
+      onPressOut={() => {
+        held.current = false;
+        if (holdToRecord.current) void stopAndSend();
+      }}
+      onPress={() => void (phase.current === 'recording' ? stopAndSend() : start(false))}
+      style={({ pressed }) => [styles.tap, recording && styles.recording, pressed && { opacity: 0.7 }]}>
+      <Text style={[styles.tapText, recording && { color: Palette.cream }]}>{label}</Text>
     </Pressable>
   );
 }
