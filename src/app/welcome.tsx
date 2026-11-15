@@ -43,7 +43,7 @@ export default function Welcome() {
           : await create({ tableName, displayName: name, language, timeZone: deviceTimeZone() });
       await setToken(result.token);
     } catch (e) {
-      setError(e instanceof ConvexError ? String(e.data) : 'Something went wrong. Check your connection and try again.');
+      setError(e instanceof ConvexError ? String(e.data) : `Something went wrong: ${e instanceof Error ? e.message : String(e)}`);
       setBusy(false);
     }
   };
@@ -69,7 +69,7 @@ export default function Welcome() {
             testID="join-code"
             value={code}
             onChangeText={(t) => setCode(t.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6))}
-            placeholder="Six-character code"
+            placeholder="ABC123"
             placeholderTextColor={Palette.inkSoft}
             autoCapitalize="characters"
             autoCorrect={false}

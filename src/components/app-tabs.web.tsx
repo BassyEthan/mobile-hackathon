@@ -23,6 +23,9 @@ export default function AppTabs() {
           <TabTrigger name="index" href="/" asChild>
             <TabButton>Today</TabButton>
           </TabTrigger>
+          <TabTrigger name="feast" href="/feast" asChild>
+            <TabButton>Feast</TabButton>
+          </TabTrigger>
           <TabTrigger name="convex-check" href="/convex-check" asChild>
             <TabButton>Convex</TabButton>
           </TabTrigger>
