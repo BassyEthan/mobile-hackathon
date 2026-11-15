@@ -1,8 +1,9 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation } from "./_generated/server";
+import { markToday } from "./schedule";
 import type { Id } from "./_generated/dataModel";
-import { canSeeDumpling, dateInZone, requireMember, sessionArgs, sparksFor } from "./lib";
+import { canSeeDumpling, dateInZone, fillingHiddenFrom, requireMember, sessionArgs, sparksFor } from "./lib";
 
 const MAX_BYTES = 80 * 1024 * 1024;
 
@@ -29,15 +30,21 @@ export const fold = mutation({
     const { member, table } = await requireMember(ctx, args);
     const now = Date.now();
     const date = dateInZone(now, table.timeZone);
-    let spark: { fillingId: Id<"fillings">; sparkKey: string; sparkText: string } | null = null;
+    let spark: { fillingId: Id<"fillings">; sparkKey: string; sparkText: string; sealed?: true; hiddenFrom?: Id<"members">[] } | null = null;
     if (args.fillingId) {
       if (args.replyTo) throw new ConvexError("Fold back or answer the spark, one at a time.");
       const filling = await ctx.db.get("fillings", args.fillingId);
-      if (!filling || filling.tableId !== table._id) throw new ConvexError("That spark belongs to another Table.");
+      if (!filling || filling.tableId !== table._id || fillingHiddenFrom(filling, member._id)) throw new ConvexError("That spark is not open to you.");
       if (filling.date !== date) throw new ConvexError("That spark has passed. Fold anything instead.");
-      const chosen = sparksFor(filling).find((s) => s.key === (args.sparkKey ?? "primary"));
+      const chosen = sparksFor(filling, "en").find((s) => s.key === (args.sparkKey ?? "primary"));
       if (!chosen) throw new ConvexError("Pick one of today's sparks.");
-      spark = { fillingId: filling._id, sparkKey: chosen.key, sparkText: chosen.text };
+      spark = {
+        fillingId: filling._id,
+        sparkKey: chosen.key,
+        sparkText: chosen.english,
+        ...(chosen.type === "sealed" ? { sealed: true as const } : {}),
+        ...(filling.hiddenFrom?.length ? { hiddenFrom: filling.hiddenFrom } : {}),
+      };
     } else if (args.sparkKey !== undefined) {
       throw new ConvexError("Pick one of today's sparks.");
     }
@@ -51,7 +58,7 @@ export const fold = mutation({
       await ctx.storage.delete(args.storageId);
       throw new ConvexError("That clip is too large.");
     }
-    if (!table.today || table.today < date) await ctx.db.patch("tables", table._id, { today: date });
+    await markToday(ctx, table, now);
     const dumplingId = await ctx.db.insert("dumplings", {
       tableId: table._id,
       memberId: member._id,

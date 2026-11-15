@@ -6,7 +6,7 @@ import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { segment } from "./schema";
-import { FILLING_PROMPTS, seatLine } from "./lib";
+import { SAFE_SPARKS, seatLine } from "./lib";
 
 type Segment = Infer<typeof segment>;
 type Gathered = NonNullable<FunctionReturnType<typeof internal.feasts.gather>>;
@@ -15,9 +15,36 @@ type Plan = { title: string; segments: Segment[]; secretIngredient: string; summ
 const TEXT_MODEL = "gpt-6.1-terra";
 const TTS_MODEL = "gpt-4o-mini-tts";
 
-export function pickClips(data: Gathered) {
-  const byMember = new Map<string, Gathered["clips"]>();
+export function findSupercut(data: Gathered) {
+  const groups = new Map<string, Map<string, Gathered["clips"][number]>>();
   for (const clip of [...data.clips].sort((a, b) => b.reactionCount - a.reactionCount)) {
+    if (!clip.sparkId) continue;
+    const group = groups.get(clip.sparkId) ?? new Map();
+    if (!group.has(clip.memberId)) group.set(clip.memberId, clip);
+    groups.set(clip.sparkId, group);
+  }
+  const best = [...groups.values()].filter((g) => g.size >= 3).sort((a, b) => b.size - a.size)[0];
+  if (!best) return null;
+  const clips = [...best.values()].slice(0, 6);
+  return { prompt: clips[0].prompt ?? "", clips };
+}
+
+export function withSupercut(segments: Segment[], supercut: ReturnType<typeof findSupercut>): Segment[] {
+  if (!supercut) return segments;
+  const at = segments.findIndex((s) => s.type === "award" || s.type === "secretIngredient");
+  const cut: Segment[] = [
+    { type: "titleCard", title: "Supercut", subtitle: supercut.prompt },
+    ...supercut.clips.map((c) => ({ type: "clip" as const, dumplingId: c.id })),
+  ];
+  return [...segments.slice(0, at), ...cut, ...segments.slice(at)];
+}
+
+export function pickClips(data: Gathered, exclude: Set<string> = new Set()) {
+  const byMember = new Map<string, Gathered["clips"]>();
+  const ranked = data.clips
+    .filter((c) => !exclude.has(c.id))
+    .sort((a, b) => Number(b.sealed) - Number(a.sealed) || b.reactionCount - a.reactionCount);
+  for (const clip of ranked) {
     byMember.set(clip.memberId, [...(byMember.get(clip.memberId) ?? []), clip]);
   }
   const picked: Gathered["clips"] = [];
@@ -58,7 +85,8 @@ export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
   if (golden) {
     segments.push({ type: "award", award: "Golden Dumpling", memberName: golden.memberName, text: `${golden.reactionCount} reactions, and not one of them was polite.`, dumplingId: golden.id });
   }
-  const secretIngredient = FILLING_PROMPTS[(data.weekOf.length + data.clips.length) % FILLING_PROMPTS.length];
+  const openSparks = SAFE_SPARKS.filter((s) => s.type !== "sealed");
+  const secretIngredient = openSparks[(data.weekOf.length + data.clips.length) % openSparks.length].text;
   segments.push({ type: "secretIngredient", prompt: secretIngredient, text: "Next week's first Filling. Start thinking." });
   return {
     title: clips.length > 0 ? `Feast: ${clips.map((c) => c.memberName).filter((n, i, all) => all.indexOf(n) === i).slice(0, 3).join(", ")} and friends` : "Feast: A Quiet Week",
@@ -171,7 +199,7 @@ export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clip
   return { title: plan.title.slice(0, 80), segments: withSeats(data, segments), secretIngredient: last.prompt, summary: typeof plan.summary === "string" ? plan.summary : plan.title };
 }
 
-async function openai(path: string, body: unknown) {
+export async function openai(path: string, body: unknown) {
   const response = await fetch(`https://api.openai.com/v1${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
@@ -193,7 +221,7 @@ function memoryEndpoint(tableId: string, operation: "search" | "document") {
   return `https://api.supermemory.ai/ns/${encodeURIComponent(`dumpling_${tableId}`)}/${operation}`;
 }
 
-async function callbacks(tableId: string) {
+export async function callbacks(tableId: string) {
   if (!process.env.SUPERMEMORY_API_KEY) return [];
   try {
     const response = await fetch(memoryEndpoint(tableId, "search"), {
@@ -247,6 +275,7 @@ async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
       member: c.memberName,
       day: c.date,
       spark: c.prompt,
+      sealed: c.sealed,
       language: c.language,
       original: c.transcript,
       english: c.english,
@@ -255,7 +284,7 @@ async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
     })),
   };
   const instructions = `You are ${data.chefName}, host of a family's Sunday show called the Feast. Write the episode as an ordered list of segments.
-Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId). Never nudge or count anyone's folds. End with exactly one secretIngredient: a new Filling prompt for next week plus a one-line tease. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
+Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId). Never nudge or count anyone's folds. Clips marked sealed were hidden until tonight, so reveal them warmly. End with exactly one secretIngredient: next Monday's spark plus a one-line tease. The spark is twelve words or fewer, one concrete action doable in ten seconds anywhere, face optional, never a favorite, opinion or summary of the day, and never a yes or no question. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
   let feedback = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await openai("/responses", {
@@ -304,9 +333,11 @@ export const cook = internalAction({
     const data = await ctx.runQuery(internal.feasts.gather, { feastId: args.feastId });
     if (!data) return null;
     try {
-      const clips = pickClips(data);
+      const supercut = findSupercut(data);
+      const clips = pickClips(data, new Set(supercut?.clips.map((c) => c.id) ?? []));
       const plan = process.env.OPENAI_API_KEY ? await aiPlan(data, clips) : templatePlan(data, clips);
-      const segments = process.env.OPENAI_API_KEY ? await voiceLines(ctx, plan.segments) : plan.segments;
+      const planned = withSupercut(plan.segments, supercut);
+      const segments = process.env.OPENAI_API_KEY ? await voiceLines(ctx, planned) : planned;
       await ctx.runMutation(internal.feasts.finish, { feastId: args.feastId, title: plan.title, segments, secretIngredient: plan.secretIngredient });
       await remember(data.tableId, plan.summary, args.feastId);
     } catch (e) {

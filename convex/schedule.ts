@@ -1,39 +1,53 @@
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { FILLING_PROMPTS, dateInZone, localHour, weekOfFor } from "./lib";
+import { addDays, dateInZone, fallbackFilling, localHour, weekOfFor } from "./lib";
 
 export const SUNDAY_COOK_HOUR = 17;
 
-export async function ensureFillingFor(ctx: MutationCtx, table: Doc<"tables">, date: string) {
+export async function pendingSecretIngredient(ctx: QueryCtx, tableId: Id<"tables">, date: string) {
+  const latestFeast = await ctx.db
+    .query("feasts")
+    .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", tableId).lt("weekOf", date))
+    .order("desc")
+    .first();
+  return latestFeast?.status === "ready" && latestFeast.secretIngredient && !latestFeast.nextFillingId ? latestFeast : null;
+}
+
+export async function markToday(ctx: MutationCtx, table: Doc<"tables">, now: number) {
+  const date = dateInZone(now, table.timeZone);
   if (!table.today || table.today < date) await ctx.db.patch("tables", table._id, { today: date });
+  return date;
+}
+
+export async function ensureFillingFor(ctx: MutationCtx, table: Doc<"tables">, date: string) {
   const existing = await ctx.db
     .query("fillings")
     .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", date))
     .unique();
   if (existing) return existing._id;
-  const latestFeast = await ctx.db
-    .query("feasts")
-    .withIndex("by_tableId_and_weekOf", (q) => q.eq("tableId", table._id).lt("weekOf", date))
-    .order("desc")
-    .first();
-  if (latestFeast?.status === "ready" && latestFeast.secretIngredient && !latestFeast.nextFillingId) {
-    const fillingId = await ctx.db.insert("fillings", { tableId: table._id, date, prompt: latestFeast.secretIngredient });
-    await ctx.db.patch("feasts", latestFeast._id, { nextFillingId: fillingId });
-    return fillingId;
-  }
-  const previous = await ctx.db
+  const recent = await ctx.db
     .query("fillings")
     .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).lt("date", date))
     .order("desc")
-    .take(FILLING_PROMPTS.length - 1);
-  const used = new Set(previous.map((f) => f.prompt));
-  const fresh = FILLING_PROMPTS.filter((p) => !used.has(p));
-  const pool = fresh.length > 0 ? fresh : FILLING_PROMPTS;
-  const index = Number(date.replaceAll("-", "")) % pool.length;
-  return await ctx.db.insert("fillings", { tableId: table._id, date, prompt: pool[index] });
+    .take(21);
+  const { primary, moreSparks } = fallbackFilling(date, recent.map((f) => ({ text: f.text ?? f.prompt, type: f.type })));
+  const secret = await pendingSecretIngredient(ctx, table._id, date);
+  const text = secret?.secretIngredient ?? primary.text;
+  const type = secret ? "tell" : primary.type;
+  const fillingId = await ctx.db.insert("fillings", {
+    tableId: table._id,
+    date,
+    prompt: text,
+    text,
+    type,
+    moreSparks: moreSparks.filter((m) => m.type !== type).map((m) => ({ text: m.text, type: m.type as "show" | "tell" | "together" | "sealed" })),
+    source: secret ? "secretIngredient" : "fallback",
+  });
+  if (secret) await ctx.db.patch("feasts", secret._id, { nextFillingId: fillingId });
+  return fillingId;
 }
 
 export async function startCook(ctx: MutationCtx, table: Doc<"tables">, now: number) {
@@ -66,7 +80,7 @@ export const dailyFillings = internalMutation({
   handler: async (ctx, args) => {
     const page = await ctx.db.query("tables").paginate({ numItems: 50, cursor: args.cursor ?? null });
     const now = Date.now();
-    for (const table of page.page) await ensureFillingFor(ctx, table, dateInZone(now, table.timeZone));
+    for (const table of page.page) await ensureFillingFor(ctx, table, await markToday(ctx, table, now));
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.schedule.dailyFillings, { cursor: page.continueCursor });
     return null;
   },

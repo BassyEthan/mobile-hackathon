@@ -124,6 +124,8 @@ const gatheredClip = v.object({
   memberName: v.string(),
   date: v.string(),
   prompt: v.union(v.string(), v.null()),
+  sparkId: v.union(v.string(), v.null()),
+  sealed: v.boolean(),
   mediaType: v.string(),
   transcript: v.union(v.string(), v.null()),
   language: v.union(v.string(), v.null()),
@@ -159,7 +161,7 @@ export const gather = internalQuery({
       .take(80);
     const clips = [];
     for (const d of dumplings) {
-      if (!d.date || d.hiddenFrom?.length || (await isDayOpen(ctx, table, d.date))) continue;
+      if (!d.date || (await isDayOpen(ctx, table, d.date))) continue;
       const filling = !d.sparkText && d.fillingId && d.answeredSpark !== false ? await ctx.db.get("fillings", d.fillingId) : null;
       const reactions = await ctx.db.query("reactions").withIndex("by_dumplingId", (q) => q.eq("dumplingId", d._id)).take(200);
       clips.push({
@@ -168,6 +170,8 @@ export const gather = internalQuery({
         memberName: names.get(d.memberId) ?? "Someone",
         date: d.date,
         prompt: d.sparkText ?? filling?.prompt ?? null,
+        sparkId: d.fillingId && d.answeredSpark !== false ? `${d.fillingId}:${d.sparkKey ?? "primary"}` : null,
+        sealed: d.sealed ?? false,
         mediaType: d.mediaType,
         transcript: d.transcript ?? null,
         language: d.language ?? null,
