@@ -26,9 +26,6 @@ export default function AppTabs() {
           <TabTrigger name="feast" href="/feast" asChild>
             <TabButton>Feast</TabButton>
           </TabTrigger>
-          <TabTrigger name="convex-check" href="/convex-check" asChild>
-            <TabButton>Convex</TabButton>
-          </TabTrigger>
         </View>
       </TabList>
     </Tabs>

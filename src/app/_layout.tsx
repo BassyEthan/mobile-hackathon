@@ -28,6 +28,7 @@ function RootStack() {
       </Stack.Protected>
       <Stack.Protected guard={!!auth}>
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="convex-check" />
         <Stack.Screen name="fold" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="player/[id]" options={{ presentation: 'fullScreenModal' }} />
       </Stack.Protected>

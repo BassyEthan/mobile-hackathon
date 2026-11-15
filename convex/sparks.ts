@@ -30,6 +30,8 @@ const contextValidator = v.object({
   date: v.string(),
   weekday: v.string(),
   languages: v.array(v.string()),
+  birthdays: v.array(v.object({ name: v.string(), date: v.string() })),
+  elders: v.array(v.string()),
   members: v.array(v.object({ id: v.id("members"), name: v.string(), language: v.string(), role: v.string(), daysSincePost: v.union(v.number(), v.null()) })),
   history: v.array(v.object({ date: v.string(), text: v.string(), type: v.union(v.string(), v.null()), answerShare: v.number(), averageReactions: v.number() })),
   queue: v.array(v.object({ id: v.id("askQueue"), authorId: v.id("members"), author: v.string(), addressedTo: v.union(v.string(), v.null()), addressedToId: v.union(v.id("members"), v.null()), text: v.string() })),
@@ -113,12 +115,22 @@ export const context = internalQuery({
       ? (await ctx.db.query("dumplings").withIndex("by_fillingId_and_memberId", (q) => q.eq("fillingId", existing._id)).first()) !== null
       : false;
     const secret = await pendingSecretIngredient(ctx, table._id, args.date);
+    const upcomingDates = Array.from({ length: 7 }, (_, offset) => addDays(args.date, offset));
+    const birthdays = members.flatMap((member) => {
+      if (!member.birthday) return [];
+      const { month, day } = member.birthday;
+      const monthDay = `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const date = upcomingDates.find((candidate) => candidate.slice(5) === monthDay);
+      return date ? [{ name: member.displayName, date }] : [];
+    });
     return {
       tableId: table._id,
       date: args.date,
       weekday: WEEKDAYS[new Date(`${args.date}T12:00:00Z`).getUTCDay()],
       languages: [...new Set(members.map((m) => m.language))],
       members: memberInfo,
+      birthdays,
+      elders: members.filter((m) => m.isElder).map((m) => m.displayName),
       history,
       queue: unused.map((q) => ({
         id: q._id,
@@ -372,8 +384,8 @@ async function generate(ctx: ActionCtx, tableId: Id<"tables">, date: string, reg
       weekday: data.weekday,
       date: data.date,
       members: data.members.map((m) => ({ name: m.name, language: m.language, role: m.role, daysSincePost: m.daysSincePost })),
-      elders: null,
-      birthdays: null,
+      elders: data.elders,
+      birthdays: data.birthdays,
       history: data.history,
       queue: data.queue.map((q) => ({ author: q.author, addressedTo: q.addressedTo ?? "everyone", question: q.text })),
       callbacks: await callbacks(tableId),
@@ -479,11 +491,7 @@ export const tomorrowSparks = internalMutation({
         .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", tomorrow))
         .first();
       if (exists) continue;
-      const active = await ctx.db
-        .query("dumplings")
-        .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", addDays(today, -7)))
-        .first();
-      if (active) await ctx.scheduler.runAfter(0, internal.sparks.generateFilling, { tableId: table._id, date: tomorrow });
+      await ctx.scheduler.runAfter(0, internal.sparks.generateFilling, { tableId: table._id, date: tomorrow });
     }
     if (!page.isDone) await ctx.scheduler.runAfter(0, internal.sparks.tomorrowSparks, { cursor: page.continueCursor });
     return null;
