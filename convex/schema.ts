@@ -85,6 +85,17 @@ export default defineSchema({
     .index("by_tableId_and_date", ["tableId", "date"])
     .index("by_memberId_and_date", ["memberId", "date"])
     .index("by_replyTo", ["replyTo"]),
+  askQueue: defineTable({
+    tableId: v.id("tables"),
+    authorId: v.id("members"),
+    text: v.string(),
+    addressedTo: v.optional(v.id("members")),
+    weekOf: v.string(),
+    createdAt: v.number(),
+    usedOn: v.optional(v.string()),
+  })
+    .index("by_authorId_and_weekOf", ["authorId", "weekOf"])
+    .index("by_tableId_and_usedOn", ["tableId", "usedOn"]),
   reactions: defineTable({
     dumplingId: v.id("dumplings"),
     memberId: v.id("members"),

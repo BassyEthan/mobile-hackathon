@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Share, StyleSheet, View } from 'react-native';
 
+import { AskTheTable } from '@/components/ask-the-table';
 import { Mascot } from '@/components/mascot';
 import { Steamer } from '@/components/steamer';
 import { Button, Card, Screen, Txt } from '@/components/ui';
@@ -114,6 +115,8 @@ export default function Today() {
           </View>
         )}
       </Card>
+
+      {date && <AskTheTable date={date} members={today.members} />}
 
       <Steamer members={today.members} lidOff={today.lidOff} dumplings={today.dumplings} />
 

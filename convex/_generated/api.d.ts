@@ -9,6 +9,7 @@
  */
 
 import type * as ai from "../ai.js";
+import type * as asks from "../asks.js";
 import type * as chef from "../chef.js";
 import type * as connectionCheck from "../connectionCheck.js";
 import type * as crons from "../crons.js";
@@ -29,6 +30,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   ai: typeof ai;
+  asks: typeof asks;
   chef: typeof chef;
   connectionCheck: typeof connectionCheck;
   crons: typeof crons;

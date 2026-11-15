@@ -82,6 +82,13 @@ await reacted;
 check("A receives B's tap reaction live", true);
 check("Table week number starts at one", withReply.week === 1);
 
+check("blank or overlong questions are rejected", (await rejects(http.mutation(api.asks.submit, { ...a, text: "  " }))) && (await rejects(http.mutation(api.asks.submit, { ...a, text: "x".repeat(141) }))));
+check("question cannot be addressed to another Table's member", await rejects(http.mutation(api.asks.submit, { ...a, text: "What's for dinner?", addressedTo: other.memberId })));
+await http.mutation(api.asks.submit, { ...a, text: "  What did you cook this week?  ", addressedTo: b.memberId });
+check("Ask the Table records one question this week", (await http.query(api.asks.status, { ...a, date: today })).askedThisWeek);
+check("a second question the same week is rejected", await rejects(http.mutation(api.asks.submit, { ...a, text: "Another one?" })));
+check("B still has a question to ask", !(await http.query(api.asks.status, { ...b, date: today })).askedThisWeek);
+
 const first = await http.mutation(api.feasts.cook, a);
 const second = await http.mutation(api.feasts.cook, b);
 check("Cook now returns one canonical Feast per Table and week", first === second);
