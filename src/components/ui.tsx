@@ -74,7 +74,13 @@ export function Button({
       {busy ? (
         <ActivityIndicator color={kind === 'primary' ? Palette.cream : Palette.ink} />
       ) : (
-        <Text style={[styles.text, big ? styles.buttonBigText : styles.buttonText, kind === 'primary' && { color: Palette.cream }]}>
+        <Text
+          style={[
+            styles.text,
+            big ? styles.buttonBigText : styles.buttonText,
+            kind === 'primary' && { color: Palette.cream },
+            kind === 'quiet' && { color: Palette.accent },
+          ]}>
           {label}
         </Text>
       )}

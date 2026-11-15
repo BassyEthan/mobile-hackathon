@@ -9,7 +9,9 @@
  */
 
 import type * as connectionCheck from "../connectionCheck.js";
+import type * as dumplings from "../dumplings.js";
 import type * as lib from "../lib.js";
+import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
 import type * as tables from "../tables.js";
 import type * as today from "../today.js";
@@ -22,7 +24,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   connectionCheck: typeof connectionCheck;
+  dumplings: typeof dumplings;
   lib: typeof lib;
+  reactions: typeof reactions;
   seed: typeof seed;
   tables: typeof tables;
   today: typeof today;
