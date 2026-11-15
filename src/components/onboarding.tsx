@@ -50,5 +50,5 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Color.bg },
   top: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingHorizontal: Space.sm },
   body: { paddingHorizontal: Space.gutter, paddingTop: Space.xl, paddingBottom: Space.xl, gap: Space.xl, flexGrow: 1 },
-  footer: { paddingHorizontal: Space.gutter, paddingTop: Space.md, gap: Space.sm, backgroundColor: Color.bg },
+  footer: { paddingHorizontal: Space.gutter, paddingTop: Space.md, gap: Space.sm, backgroundColor: Color.bg, borderTopWidth: 2.5, borderColor: Color.ink },
 });

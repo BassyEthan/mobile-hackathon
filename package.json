@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/ui": "~58.0.28",
     "convex": "^1.50.0",
     "expo": "~58.0.25",
+    "expo-asset": "~58.0.21",
     "expo-audio": "~58.0.12",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.16",
@@ -48,6 +50,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "share": "expo start --tunnel ngrok",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

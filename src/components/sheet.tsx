@@ -30,7 +30,7 @@ export function Sheet({ visible, title, onClose, children }: { visible: boolean;
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: Color.scrim },
-  sheet: { backgroundColor: Color.bg, paddingHorizontal: Space.gutter, paddingTop: Space.sm, borderTopLeftRadius: Radius.sheet, borderTopRightRadius: Radius.sheet, maxHeight: '90%' },
-  grabber: { alignSelf: 'center', width: 36, height: 5, borderRadius: 3, backgroundColor: Color.borderStrong, marginBottom: Space.sm },
+  sheet: { backgroundColor: Color.bg, paddingHorizontal: Space.gutter, paddingTop: Space.sm, borderTopLeftRadius: Radius.sheet, borderTopRightRadius: Radius.sheet, borderWidth: 2.5, borderBottomWidth: 0, borderColor: Color.ink, maxHeight: '90%' },
+  grabber: { alignSelf: 'center', width: 44, height: 6, borderRadius: 3, backgroundColor: Color.ink, marginBottom: Space.sm },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: Space.lg },
 });

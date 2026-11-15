@@ -7,7 +7,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/icon';
-import { Color, Font, Radius } from '@/constants/dumpling';
+import { DumplingLogo } from '@/components/logo';
+import { Color, Font, Stroke } from '@/constants/dumpling';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useElder, useMe, useSession, useToday } from '@/lib/session';
 import { useSeen } from '@/lib/seen';
@@ -16,11 +17,11 @@ import { api } from '../../convex/_generated/api';
 type Props = Omit<TabTriggerSlotProps, 'ref'> & Pick<ComponentProps<typeof Pressable>, 'ref'> & { icon: IconName; dot?: boolean };
 
 function TabButton({ children, isFocused, icon, dot, ...props }: Props) {
-  const color = isFocused ? Color.brandDeep : Color.textSoft;
+  const color = isFocused ? Color.ink : Color.textSoft;
   return (
     <Pressable {...props} accessibilityRole="tab" accessibilityState={{ selected: isFocused }} style={styles.tab}>
-      <View>
-        <Icon name={icon} size={24} color={color} fill={isFocused ? Color.brandTint : undefined} />
+      <View style={[styles.tabIcon, isFocused && styles.tabIconOn]}>
+        <Icon name={icon} size={22} color={color} />
         {dot && !isFocused && <View style={styles.dot} accessibilityLabel="New" />}
       </View>
       <Text maxFontSizeMultiplier={1.3} style={[styles.label, { color }]}>{children}</Text>
@@ -41,11 +42,15 @@ function FoldButton() {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         router.push('/fold');
       }}
-      style={({ pressed }) => [styles.tab, pressed && (reduced ? { opacity: 0.7 } : { transform: [{ scale: 0.95 }] })]}>
-      <View style={styles.fold}>
-        <Icon name="video" size={26} color={Color.surface} />
-      </View>
-      <Text maxFontSizeMultiplier={1.3} style={[styles.label, { color: Color.text }]}>Fold</Text>
+      style={({ pressed }) => [styles.tab, pressed && reduced && { opacity: 0.7 }]}>
+      {({ pressed }) => (
+        <>
+          <View style={[styles.fold, pressed && !reduced && styles.foldPressed]}>
+            <DumplingLogo size={42} />
+          </View>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.label, { color: Color.ink }]}>Fold</Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -91,13 +96,16 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: Color.borderStrong,
-    backgroundColor: Color.bg,
+    paddingTop: 10,
+    borderTopWidth: Stroke.line,
+    borderColor: Color.ink,
+    backgroundColor: Color.surface,
   },
-  tab: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
-  label: { fontSize: 11, fontWeight: '600', fontFamily: Font.ui },
-  dot: { position: 'absolute', top: -1, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: Color.brand, borderWidth: 1.5, borderColor: Color.bg },
-  fold: { width: 58, height: 46, borderRadius: Radius.button, backgroundColor: Color.brand, alignItems: 'center', justifyContent: 'center', marginTop: -10 },
+  tab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'flex-end', gap: 3 },
+  tabIcon: { width: 52, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  tabIconOn: { backgroundColor: Color.goldSoft, borderWidth: 1.5, borderColor: Color.ink },
+  label: { fontSize: 12, fontWeight: '700', fontFamily: Font.brand },
+  dot: { position: 'absolute', top: 0, right: 6, width: 12, height: 12, borderRadius: 6, backgroundColor: Color.brand, borderWidth: 2, borderColor: Color.ink },
+  fold: { width: 68, height: 56, borderRadius: 20, backgroundColor: Color.logo, borderWidth: Stroke.line, borderBottomWidth: Stroke.lip + 1, borderColor: Color.ink, alignItems: 'center', justifyContent: 'center', marginTop: -24 },
+  foldPressed: { borderBottomWidth: Stroke.line, transform: [{ translateY: Stroke.lip + 1 - Stroke.line }] },
 });

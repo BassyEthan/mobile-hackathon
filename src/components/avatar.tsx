@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { LogoMark } from '@/components/logo';
 import { Txt } from '@/components/ui';
 import { Color, Font, Space, avatarTone } from '@/constants/dumpling';
 import { useMe, useSession, useToday } from '@/lib/session';
@@ -21,7 +22,7 @@ export function Avatar({ name, size = 36, folded, ring }: { name: string; size?:
         style={[
           styles.avatar,
           { width: size, height: size, borderRadius: size / 2, backgroundColor: avatarTone(name) },
-          ring && { borderWidth: 2, borderColor: Color.bg },
+          { borderWidth: ring ? 2 : 1.5, borderColor: Color.ink },
         ]}>
         <Text maxFontSizeMultiplier={1.2} style={[styles.initials, { fontSize: size * 0.38 }]}>{initials(name)}</Text>
       </View>
@@ -43,8 +44,9 @@ export function TableHeader({ subtitle }: { subtitle?: string }) {
   const shown = others.slice(0, 3);
   return (
     <View style={styles.header}>
+      <LogoMark size={44} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt variant="title" numberOfLines={1} testID="table-name">{me?.tableName ?? ' '}</Txt>
+        <Txt variant="title" numberOfLines={1} testID="table-name" style={{ fontSize: 27, lineHeight: 33 }}>{me?.tableName ?? ' '}</Txt>
         {subtitle ? <Txt variant="meta" numberOfLines={1}>{subtitle}</Txt> : null}
       </View>
       <Pressable
@@ -56,7 +58,7 @@ export function TableHeader({ subtitle }: { subtitle?: string }) {
         style={({ pressed }) => [styles.stack, pressed && { opacity: 0.7 }]}>
         {shown.length === 0 ? (
           <View style={styles.addSeat}>
-            <Icon name="plus" size={18} color={Color.brandDeep} />
+            <Icon name="plus" size={18} color={Color.ink} />
           </View>
         ) : (
           shown.map((s, i) => (
@@ -84,9 +86,9 @@ export function TableHeader({ subtitle }: { subtitle?: string }) {
 
 const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center' },
-  initials: { color: Color.text, fontWeight: '600', fontFamily: Font.ui },
-  dot: { position: 'absolute', backgroundColor: Color.brand, borderWidth: 2, borderColor: Color.bg },
+  initials: { color: Color.ink, fontWeight: '800', fontFamily: Font.display },
+  dot: { position: 'absolute', backgroundColor: Color.mint, borderWidth: 2, borderColor: Color.ink },
   header: { flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingHorizontal: Space.gutter, paddingTop: Space.sm, paddingBottom: Space.md },
   stack: { flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingLeft: Space.xs },
-  addSeat: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: Color.brand, alignItems: 'center', justifyContent: 'center' },
+  addSeat: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: Color.ink, backgroundColor: Color.surface, alignItems: 'center', justifyContent: 'center' },
 });

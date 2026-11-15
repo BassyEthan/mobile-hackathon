@@ -34,7 +34,7 @@ function close() {
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <View style={[styles.root, { justifyContent: 'center' }]}>
-      <StateView dark icon="retry" title="The Feast did not load" body="Check your connection and try again." action={<Button label="Try again" onPress={() => void retry()} />} />
+      <StateView dark mascot="wow" title="The Feast did not load" body="Check your connection and try again." action={<Button label="Try again" onPress={() => void retry()} />} />
       <Button kind="onDark" label="Close" onPress={close} />
     </View>
   );
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   rule: { width: 28, height: 1, backgroundColor: Color.gold, marginBottom: Space.sm },
   kicker: { color: Color.brand, fontSize: 14, fontWeight: '600', fontFamily: Font.ui },
   line: { color: Color.nightText, fontSize: 21, lineHeight: 30, textAlign: 'center', fontFamily: Font.ui, maxWidth: 560 },
-  title: { color: Color.nightText, fontSize: 30, lineHeight: 37, fontWeight: '600', textAlign: 'center', fontFamily: Font.brand, maxWidth: 560 },
+  title: { color: Color.nightText, fontSize: 30, lineHeight: 37, fontWeight: '700', textAlign: 'center', fontFamily: Font.brand, maxWidth: 560 },
   phrase: { color: Color.nightText, fontSize: 34, lineHeight: 44, fontWeight: '600', textAlign: 'center' },
   romanization: { color: Color.nightSoft, fontSize: 20, fontStyle: 'italic', textAlign: 'center' },
   voiceDisc: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(251,244,236,0.1)', alignItems: 'center', justifyContent: 'center' },

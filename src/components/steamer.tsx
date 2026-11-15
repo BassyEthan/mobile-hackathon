@@ -5,10 +5,11 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimension
 
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
+import { DumplingLoader } from '@/components/loader';
 import { Mascot } from '@/components/mascot';
 import { reactionTotal, type ReactionSummary } from '@/components/reactions';
 import { Button, ProgressBar, Txt } from '@/components/ui';
-import { Color, Font, Radius, Space } from '@/constants/dumpling';
+import { Color, Font, Radius, Space, Stroke, popFor } from '@/constants/dumpling';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import type { OutboxItem } from '@/lib/outbox';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -88,13 +89,13 @@ export function ClipTile({ clip, width, onPress, autoplay }: { clip: Clip; width
       accessibilityLabel={`${clip.memberName}${clip.replyToName ? `, folding back to ${clip.replyToName}` : ''}, ${time(clip.createdAt)}${clip.caption ? `. ${clip.caption}` : ''}`}
       accessibilityHint="Opens full screen with sound"
       onPress={onPress}
-      style={({ pressed }) => [{ width, gap: Space.sm }, pressed && { opacity: 0.85 }]}>
-      <View style={[styles.media, { height: width * 1.3 }]}>
+      style={({ pressed }) => [{ width, gap: Space.sm }, pressed && { transform: [{ scale: 0.97 }] }]}>
+      <View style={[styles.media, { height: width * 1.3, backgroundColor: popFor(clip.memberName).soft }]}>
         {clip.mediaType === 'video' && clip.url ? (
           <MutedVideo url={clip.url} play={autoplay} />
         ) : (
           <View style={styles.audio}>
-            <Icon name="voice" size={28} color={Color.brandDeep} />
+            <View style={[styles.voiceBlob, { backgroundColor: popFor(clip.memberName).fill }]}><Icon name="voice" size={28} color={Color.ink} /></View>
             {clip.caption && <Text numberOfLines={4} style={styles.audioCaption}>{clip.caption}</Text>}
           </View>
         )}
@@ -112,7 +113,7 @@ export function ClipTile({ clip, width, onPress, autoplay }: { clip: Clip; width
         )}
       </View>
       <View style={{ gap: 1, paddingHorizontal: 2 }}>
-        <Txt variant="callout" numberOfLines={1} style={{ fontWeight: '600' }}>{clip.memberName}</Txt>
+        <Txt variant="headline" numberOfLines={1} style={{ fontSize: 16, lineHeight: 21 }}>{clip.memberName}</Txt>
         <Txt variant="caption" numberOfLines={1}>
           {time(clip.createdAt)}
           {clip.caption && clip.mediaType === 'video' ? ` · ${clip.caption}` : ''}
@@ -124,12 +125,18 @@ export function ClipTile({ clip, width, onPress, autoplay }: { clip: Clip; width
 
 function SendingTile({ item, width, onRetry, onDiscard }: { item: OutboxItem; width: number; onRetry: () => void; onDiscard: () => void }) {
   const failed = item.state === 'failed';
+  // Queued and about to upload counts as working; a retry waiting on the network does not.
+  const working = item.state === 'sending' || (item.state === 'waiting' && !item.error);
   return (
     <View style={{ width, gap: Space.sm }} testID="sending-tile">
       <View style={[styles.media, styles.sending, { height: width * 1.3 }]}>
-        <Icon name={failed ? 'retry' : item.state === 'sending' ? 'send' : 'offline'} size={22} color={failed ? Color.danger : Color.brandDeep} />
+        {working ? (
+          <DumplingLoader size={Math.min(64, width * 0.42)} label={`Folding into the steamer, ${Math.round(item.progress * 100)} percent`} />
+        ) : (
+          <Icon name={failed ? 'retry' : 'offline'} size={22} color={failed ? Color.danger : Color.brandDeep} />
+        )}
         <Txt variant="meta" style={{ textAlign: 'center', color: Color.text }}>
-          {failed ? 'This one did not send' : item.state === 'sending' ? 'Sending…' : 'Waiting for a connection'}
+          {failed ? 'This one did not send' : working ? 'Folding into the steamer…' : 'Waiting for a connection'}
         </Txt>
         {item.state === 'sending' && <View style={{ alignSelf: 'stretch' }}><ProgressBar value={item.progress} /></View>}
         {failed && (
@@ -183,7 +190,7 @@ export function Steamer({
     return (
       <View style={styles.lid} testID="steamer-lid">
         <View style={styles.lidTop}>
-          <Mascot size={44} steaming={folded.length > 0} />
+          <Mascot size={56} steaming={folded.length > 0} />
           <View style={{ flex: 1, gap: 2 }}>
             <Txt variant="headline" testID="steamer-status">
               {who ? `${who} ${folded.length === 1 ? 'has' : 'have'} folded` : 'The steamer is warming up'}
@@ -210,7 +217,7 @@ export function Steamer({
         {sending ? (
           pending.map((p) => <SendingTile key={p.id} item={p} width={tile} onRetry={() => onRetry(p.id)} onDiscard={() => onDiscard(p.id)} />)
         ) : (
-          <Button testID="lift-lid" kind="secondary" icon="video" label="Fold to lift the lid" onPress={onFold} />
+          <Button testID="lift-lid" icon="video" label="Fold to lift the lid" onPress={onFold} />
         )}
       </View>
     );
@@ -219,9 +226,12 @@ export function Steamer({
   const ordered = threadOrder(clips);
   if (ordered.length === 0 && pending.length === 0) {
     return (
-      <View style={styles.lid}>
-        <Txt variant="headline">{isToday ? 'Nothing here yet' : 'A quiet day'}</Txt>
-        <Txt variant="meta">{isToday ? 'Your family’s moments will appear here as they fold.' : 'Nobody folded on this day.'}</Txt>
+      <View style={[styles.lid, { alignItems: 'center' }]}>
+        <Mascot size={72} steaming={isToday} />
+        <View style={{ gap: 2, alignItems: 'center' }}>
+          <Txt variant="headline">{isToday ? 'Nothing here yet' : 'A quiet day'}</Txt>
+          <Txt variant="meta" style={{ textAlign: 'center' }}>{isToday ? 'Your family’s moments will appear here as they fold.' : 'Nobody folded on this day.'}</Txt>
+        </View>
       </View>
     );
   }
@@ -241,13 +251,14 @@ export function Steamer({
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.md, rowGap: Space.lg },
-  media: { borderRadius: Radius.tile, overflow: 'hidden', backgroundColor: Color.surface2 },
+  media: { borderRadius: Radius.tile, overflow: 'hidden', backgroundColor: Color.surface2, borderWidth: Stroke.line, borderBottomWidth: Stroke.lip, borderColor: Color.ink },
+  voiceBlob: { width: 60, height: 60, borderRadius: 30, borderWidth: Stroke.line, borderColor: Color.ink, alignItems: 'center', justifyContent: 'center' },
   audio: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Space.sm, padding: Space.md },
-  audioCaption: { color: Color.text, fontSize: 14, lineHeight: 19, textAlign: 'center', fontFamily: Font.ui },
-  badge: { position: 'absolute', top: 8, left: 8, maxWidth: '70%', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, height: 24, borderRadius: 12, backgroundColor: 'rgba(23,17,14,0.55)' },
-  badgeText: { color: Color.nightText, fontSize: 12, fontWeight: '600', fontFamily: Font.ui },
-  sending: { alignItems: 'center', justifyContent: 'center', gap: Space.sm, padding: Space.md, borderWidth: 1, borderColor: Color.border, borderStyle: 'dashed' },
-  lid: { backgroundColor: Color.surface, borderRadius: Radius.card, borderWidth: 1, borderColor: Color.border, padding: Space.lg, gap: Space.lg },
+  audioCaption: { color: Color.ink, fontSize: 15, lineHeight: 20, textAlign: 'center', fontFamily: Font.italic, fontStyle: 'italic', fontWeight: '700' },
+  badge: { position: 'absolute', top: 8, left: 8, maxWidth: '70%', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, height: 26, borderRadius: 13, backgroundColor: Color.ink },
+  badgeText: { color: Color.nightText, fontSize: 12, fontWeight: '700', fontFamily: Font.brand },
+  sending: { alignItems: 'center', justifyContent: 'center', gap: Space.sm, padding: Space.md, borderStyle: 'dashed', borderBottomWidth: Stroke.line, backgroundColor: Color.surface },
+  lid: { backgroundColor: Color.surface, borderRadius: Radius.card, borderWidth: Stroke.line, borderBottomWidth: Stroke.lip, borderColor: Color.ink, padding: Space.lg, gap: Space.lg },
   lidTop: { flexDirection: 'row', alignItems: 'center', gap: Space.md },
   seats: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.md },
   seat: { alignItems: 'center', gap: 4, width: 56 },

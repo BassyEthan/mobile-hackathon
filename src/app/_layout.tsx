@@ -1,15 +1,20 @@
+import { Nunito_700Bold, Nunito_700Bold_Italic, Nunito_800ExtraBold, useFonts } from '@expo-google-fonts/nunito';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
 
+import { LoadingSplash } from '@/components/splash';
+import { Button, StateView } from '@/components/ui';
 import { Color } from '@/constants/dumpling';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useNotificationRouting } from '@/lib/notifications';
 import { OutboxProvider } from '@/lib/outbox';
 import { SeenProvider } from '@/lib/seen';
 import { MeProvider, SessionProvider, useSession } from '@/lib/session';
+import { saveMembership, saveValue } from '@/lib/storage';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,9 +29,6 @@ function RootStack() {
   const { ready, auth, setup } = useSession();
   const seated = !!auth && !setup;
   useNotificationRouting(seated);
-  useEffect(() => {
-    if (ready) void SplashScreen.hideAsync();
-  }, [ready]);
   if (!ready) return null;
   const modal = { presentation: 'fullScreenModal' as const, animation: reducedMotion ? ('none' as const) : ('slide_from_bottom' as const) };
   return (
@@ -56,6 +58,51 @@ function RootStack() {
   );
 }
 
+/**
+ * Last line of defence. A seat that ends while screens are still open (left on another device, removed, or deleted)
+ * makes the server reject every query with "seat … expired". Instead of a crash, forget the seat on this device and
+ * start over at Welcome. Anything else shows a calm retry.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const expired = /seat at this Table has expired/i.test(error?.message ?? '');
+  useEffect(() => {
+    if (!expired) return;
+    void Promise.all([saveMembership(null), saveValue('setup', null)]).then(() => retry());
+  }, [expired, retry]);
+  return (
+    <View style={{ flex: 1, backgroundColor: Color.bg, justifyContent: 'center', padding: 20 }}>
+      {expired ? (
+        <StateView mascot="smile" title="Taking you back to the start" />
+      ) : (
+        <StateView mascot="wow" title="Something went wrong" body="Try again in a moment." action={<Button label="Try again" onPress={() => void retry()} />} />
+      )}
+    </View>
+  );
+}
+
+/** The app, with the animated loading screen laid over it until the session is ready. */
+function AppShell() {
+  const { ready } = useSession();
+  // Nunito ships inside the app bundle, so this resolves in a few milliseconds. A font that fails to load
+  // falls back to the system face rather than blocking the app.
+  const [fontsLoaded, fontError] = useFonts({ Nunito_700Bold, Nunito_800ExtraBold, Nunito_700Bold_Italic });
+  const fontsReady = fontsLoaded || !!fontError;
+  const [splash, setSplash] = useState(true);
+  // The in-app splash lines up with the native one, so hand over as soon as its words can render in Nunito.
+  useEffect(() => {
+    if (fontsReady) void SplashScreen.hideAsync();
+  }, [fontsReady]);
+  const done = useCallback(() => setSplash(false), []);
+  if (!fontsReady) return null;
+  return (
+    <View style={{ flex: 1, backgroundColor: Color.bg }}>
+      <StatusBar style={splash ? 'light' : 'dark'} />
+      <RootStack />
+      {splash && <LoadingSplash ready={ready} onDone={done} />}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   return (
     <ConvexProvider client={convex}>
@@ -64,8 +111,7 @@ export default function RootLayout() {
           <OutboxProvider>
             <SeenProvider>
               <ThemeProvider value={theme}>
-                <StatusBar style="dark" />
-                <RootStack />
+                <AppShell />
               </ThemeProvider>
             </SeenProvider>
           </OutboxProvider>

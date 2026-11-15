@@ -7,7 +7,6 @@ import { loadMembership, loadValue, saveMembership, saveValue, type Membership }
 
 /** What the host chose in onboarding, kept until the last setup step so "Your Table is set" can mirror it back. */
 export type HostSetup = {
-  who: string[];
   missMost: string | null;
   languages: string[];
   feastHour: number;
@@ -18,6 +17,12 @@ type Session = {
   ready: boolean;
   auth: Membership | null;
   setAuth: (auth: Membership | null) => Promise<void>;
+  /**
+   * Signs this device out, then runs `action` (leave, delete) with the old seat. Every live query stops first, so
+   * nothing re-runs against a seat the server has just ended. If the action fails, the seat is restored and the
+   * error is rethrown.
+   */
+  signOut: (action?: (auth: Membership) => Promise<unknown>) => Promise<void>;
   setup: HostSetup | null;
   setSetup: (setup: HostSetup | null) => Promise<void>;
 };
@@ -26,6 +31,7 @@ const SessionContext = createContext<Session>({
   ready: false,
   auth: null,
   setAuth: async () => {},
+  signOut: async () => {},
   setup: null,
   setSetup: async () => {},
 });
@@ -53,12 +59,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAuthState(next);
   }, []);
 
+  const signOut = useCallback(
+    async (action?: (auth: Membership) => Promise<unknown>) => {
+      const current = auth;
+      setAuthState(null);
+      // Let React commit the signed-out render, so every live query has unsubscribed (and told the server so)
+      // before the request that ends the seat is sent on the same connection.
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+      if (current && action) {
+        try {
+          await action(current);
+        } catch (e) {
+          setAuthState(current);
+          throw e;
+        }
+      }
+      await setAuth(null);
+    },
+    [auth, setAuth],
+  );
+
   const setSetup = useCallback(async (next: HostSetup | null) => {
     await saveValue('setup', next);
     setSetupState(next);
   }, []);
 
-  return <SessionContext.Provider value={{ ready, auth, setAuth, setup, setSetup }}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ ready, auth, setAuth, signOut, setup, setSetup }}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {

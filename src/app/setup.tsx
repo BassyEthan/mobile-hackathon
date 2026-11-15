@@ -9,7 +9,7 @@ import { Step } from '@/components/onboarding';
 import { Recorder } from '@/components/recorder';
 import { Button, Loading, ProgressBar, Txt } from '@/components/ui';
 import { Color, Radius, Space, feastTimeLabel, languageLabel } from '@/constants/dumpling';
-import { FIRST_SPARK, HOST_STEPS, WHO } from '@/lib/intake';
+import { FIRST_SPARK, HOST_STEPS, SETUP_FIRST_STEP, START_STEPS } from '@/lib/intake';
 import { shareInvite } from '@/lib/invite';
 import { enableNotifications } from '@/lib/notifications';
 import { useOutbox } from '@/lib/outbox';
@@ -29,7 +29,7 @@ function SummaryLine({ icon, label, value }: { icon: IconName; label: string; va
 }
 
 /**
- * Host onboarding, steps 10 to 13, after the Table exists: the tailored summary, the very first Fold (camera access is
+ * Host onboarding, the last four steps, after the Table exists: the tailored summary, the very first Fold (camera access is
  * asked for here, at the moment of use), the invite, and last of all notifications, phrased as a benefit.
  */
 export default function Setup() {
@@ -46,16 +46,13 @@ export default function Setup() {
 
   const go = (step: number) => void setSetup({ ...setup, step });
   const done = () => void setSetup(null);
-  const progress = (setup.step + 1) / HOST_STEPS;
+  const progress = (START_STEPS + (setup.step - SETUP_FIRST_STEP) + 1) / HOST_STEPS;
   const spark = day?.filling?.sparks[0]?.text ?? FIRST_SPARK[setup.missMost ?? ''] ?? 'Show us what’s outside your window.';
-  const whoLabel = setup.who.map((k) => WHO.find((w) => w.key === k)?.label.toLowerCase()).filter(Boolean).join(', ');
-  const person = WHO.find((w) => w.key === setup.who[0])?.person ?? 'your family';
 
   if (setup.step <= 11) {
     return (
       <Step progress={progress} title="Your Table is set." detail={`${me.tableName}, ready for its first Dumpling.`} footer={<Button testID="continue" size="lg" label="Fold the first Dumpling" icon="video" onPress={() => go(12)} />}>
         <View style={styles.summary} testID="table-summary">
-          <SummaryLine icon="family" label="Who’s coming" value={whoLabel ? whoLabel[0].toUpperCase() + whoLabel.slice(1) : 'Your family'} />
           <SummaryLine icon="language" label="Captions in" value={setup.languages.map(languageLabel).join(', ')} />
           <SummaryLine icon="spark" label="Your first spark" value={spark} />
           <SummaryLine icon="feast" label="Your Feast" value={`Sundays at ${feastTimeLabel(setup.feastHour)}`} />
@@ -118,7 +115,7 @@ export default function Setup() {
   return (
     <Step
       progress={1}
-      title={`Want to know when ${person} folds?`}
+      title="Want to know when your family folds?"
       detail="We’ll tell you when someone shares, when they ask you something and when the Feast is served. Never more than two a day."
       footer={
         <>

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AskSheet } from '@/components/ask-the-table';
 import { TableHeader } from '@/components/avatar';
 import { Icon } from '@/components/icon';
+import { DumplingLoader } from '@/components/loader';
 import { Sheet } from '@/components/sheet';
 import { Steamer } from '@/components/steamer';
 import { AskedCard, DayStrip, ReflectionCard, SparkCard, nextReflection } from '@/components/today-parts';
@@ -32,7 +33,7 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <Screen scroll={false}>
       <View style={{ flex: 1, justifyContent: 'center' }}>
-        <StateView icon="retry" title="Today did not load" body="Check your connection, then try again." action={<Button label="Try again" onPress={() => void retry()} />} />
+        <StateView mascot="wow" title="Today did not load" body="Check your connection, then try again." action={<Button label="Try again" onPress={() => void retry()} />} />
       </View>
     </Screen>
   );
@@ -113,7 +114,7 @@ export default function Today() {
   const foldSpark = () => spark && day.filling && fold({ fillingId: day.filling.id, sparkKey: spark.key, prompt: spark.text });
 
   const banner = !isToday ? null : latest?.status === 'cooking' ? (
-    <Banner icon="feast" tone="plain" title="The Chef is cooking your Feast" detail="It will be ready in about a minute." onPress={() => router.navigate('/feast')} />
+    <Banner icon="feast" leading={<DumplingLoader compact size={34} label="Cooking your Feast" />} tone="plain" title="The Chef is cooking your Feast" detail="It will be ready in about a minute." onPress={() => router.navigate('/feast')} />
   ) : latestReady && seen.loaded && seen.feastId !== latestReady.id ? (
     <Banner
       testID="feast-banner"

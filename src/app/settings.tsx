@@ -19,7 +19,7 @@ type Patch = Omit<FunctionArgs<typeof api.tables.updateProfile>, 'token' | 'memb
 
 /** Every setting on one screen, saved as soon as it changes. */
 export default function Settings() {
-  const { auth, setAuth } = useSession();
+  const { auth, signOut } = useSession();
   const me = useMe();
   const update = useMutation(api.tables.updateProfile);
   const savePushToken = useMutation(api.tables.savePushToken);
@@ -120,9 +120,10 @@ export default function Settings() {
               {
                 text: 'Delete',
                 style: 'destructive',
-                onPress: async () => {
-                  await deleteAccount({ ...auth });
-                  await setAuth(null);
+                onPress: () => {
+                  signOut((seat) => deleteAccount({ ...seat })).catch((e) =>
+                    Alert.alert('Could not delete your account', e instanceof ConvexError ? String(e.data) : 'Check your connection and try again.'),
+                  );
                 },
               },
             ])

@@ -18,7 +18,7 @@ const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <Screen header={<NavBar onBack={back} title="Your Table" />}>
-      <StateView icon="retry" title="Your Table did not load" body="Check your connection, then try again." action={<Button label="Try again" onPress={() => void retry()} />} />
+      <StateView mascot="wow" title="Your Table did not load" body="Check your connection, then try again." action={<Button label="Try again" onPress={() => void retry()} />} />
     </Screen>
   );
 }
@@ -73,7 +73,7 @@ function RenameSheet({ visible, onClose, current }: { visible: boolean; onClose:
 }
 
 export default function TableScreen() {
-  const { auth, setAuth } = useSession();
+  const { auth, signOut } = useSession();
   const me = useMe();
   const date = useToday(me?.timeZone);
   const seats = useQuery(api.tables.seats, auth && date ? { ...auth, date } : 'skip');
@@ -150,10 +150,11 @@ export default function TableScreen() {
               {
                 text: 'Leave',
                 style: 'destructive',
-                onPress: async () => {
+                onPress: () => {
                   if (!auth) return;
-                  await leave({ ...auth });
-                  await setAuth(null);
+                  signOut((seat) => leave({ ...seat })).catch((e) =>
+                    Alert.alert('Could not leave the Table', e instanceof ConvexError ? String(e.data) : 'Check your connection and try again.'),
+                  );
                 },
               },
             ])

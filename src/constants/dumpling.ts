@@ -1,57 +1,97 @@
 import { Platform } from 'react-native';
 
 /**
- * Dumpling's design language: warm editorial minimalism.
- * Ivory paper, espresso ink, hairline borders. Orange is heat: it marks the one action that matters on a screen,
- * active states and small brand accents. Family video carries the colour everywhere else.
+ * Dumpling's design language: the family kitchen.
+ * Rice-paper cream, soy-brown ink, confident outlines and food colours: chili, saffron, bok choy, porcelain,
+ * plum and peach. Headings are set in a serif, like a handwritten family recipe card; controls stay rounded and
+ * sturdy so every age at the table can use them.
  */
 export const Color = {
-  bg: '#FFFAF4',
-  surface: '#FFFFFF',
-  surface2: '#F7F0E7',
-  text: '#30251F',
-  textSoft: '#82746A',
-  brand: '#E8753D',
-  brandDeep: '#C85A2C',
-  brandTint: '#FCEDE3',
-  border: '#EDE3D8',
-  borderStrong: '#DDCFBF',
-  night: '#17110E',
-  nightSurface: '#251C17',
-  nightText: '#FBF4EC',
-  nightSoft: '#B9AA9C',
-  nightLine: 'rgba(251,244,236,0.16)',
-  gold: '#D7AE5E',
-  goldDeep: '#A57A2E',
-  goldSoft: '#F4E5C3',
-  danger: '#B9442E',
-  success: '#4F7A4A',
-  scrim: 'rgba(23,17,14,0.42)',
+  bg: '#FBF2E4',
+  surface: '#FFFCF7',
+  surface2: '#F3E4CC',
+  text: '#37251A',
+  textSoft: '#7A6455',
+  ink: '#37251A',
+  brand: '#E2633A',
+  brandDeep: '#B4471F',
+  brandTint: '#FBE0D2',
+  border: '#EADBC3',
+  borderStrong: '#37251A',
+  night: '#21150F',
+  nightSurface: '#35251B',
+  nightText: '#FBF2E4',
+  nightSoft: '#CBB7A4',
+  nightLine: 'rgba(251,242,228,0.18)',
+  gold: '#EFAE3A',
+  goldDeep: '#8F5F0C',
+  goldSoft: '#FAE6BA',
+  sun: '#EFAE3A',
+  mint: '#5E9E74',
+  mintSoft: '#DDEEDD',
+  sky: '#3F8796',
+  skySoft: '#D8EAEC',
+  grape: '#8C4E6B',
+  grapeSoft: '#F1DEE6',
+  pink: '#EE9F7E',
+  pinkSoft: '#FBE4D8',
+  danger: '#C23B22',
+  success: '#3F8A5A',
+  scrim: 'rgba(33,21,15,0.5)',
+  /** Exact colours from the logo artwork. */
+  logo: '#EE8152',
+  logoCream: '#FCF1DE',
+  logoInk: '#37251A',
+  logoCheek: '#F2AD90',
 } as const;
+
+/** Food colours, in order. Used to give cards and people a colour of their own. */
+export const Pop = [
+  { fill: Color.sun, soft: Color.goldSoft },
+  { fill: Color.mint, soft: Color.mintSoft },
+  { fill: Color.sky, soft: Color.skySoft },
+  { fill: Color.grape, soft: Color.grapeSoft },
+  { fill: Color.pink, soft: Color.pinkSoft },
+  { fill: Color.brand, soft: Color.brandTint },
+] as const;
+
+/** Outline weights. Sturdy surfaces sit on a slightly thicker bottom edge so they read as pressable. */
+export const Stroke = { line: 2, lip: 4 } as const;
 
 /** 4 / 8 / 12 / 16 / 24 / 32 / 40 */
 export const Space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, gutter: 20 } as const;
 
-/** Corner radii are deliberately different per role so nothing looks inflated. */
-export const Radius = { card: 20, tile: 16, button: 16, chip: 12, sheet: 24, round: 999 } as const;
+/** Soft but not bubbly corners. */
+export const Radius = { card: 22, tile: 18, button: 16, chip: 12, pill: 999, sheet: 28, round: 999 } as const;
 
 export const Font = {
   /** SF Pro (system) for interface text. */
   ui: Platform.select({ ios: 'System', default: undefined }),
-  /** SF Pro Rounded, reserved for brand moments: the wordmark, Feast titles, award names. */
-  brand: Platform.select({ ios: 'ui-rounded', web: 'ui-rounded, system-ui, sans-serif', default: undefined }),
+  /**
+   * Nunito: the brand face. Its rounded terminals echo the thick, soft strokes of the logo.
+   * Always pair each face with its own weight (brand 700, display 800) so iOS and Android pick the same file.
+   */
+  brand: 'Nunito_700Bold',
+  /** Nunito ExtraBold: titles, sparks, the wordmark. */
+  display: 'Nunito_800ExtraBold',
+  /** Nunito Bold Italic: quotes and taglines. */
+  italic: 'Nunito_700Bold_Italic',
 } as const;
 
-/** Size / line height pairs. Weights stay between regular and semibold. */
+/** Size / line height pairs. Nunito titles and headlines, plain system body. */
 export const Type = {
-  display: { fontSize: 30, lineHeight: 36, fontWeight: '600' },
-  title: { fontSize: 21, lineHeight: 27, fontWeight: '600' },
-  headline: { fontSize: 17, lineHeight: 23, fontWeight: '600' },
+  display: { fontSize: 32, lineHeight: 39, fontWeight: '800' },
+  title: { fontSize: 24, lineHeight: 30, fontWeight: '800' },
+  headline: { fontSize: 17, lineHeight: 23, fontWeight: '700' },
   body: { fontSize: 16, lineHeight: 23, fontWeight: '400' },
   callout: { fontSize: 15, lineHeight: 21, fontWeight: '500' },
   meta: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
-  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '600' },
 } as const;
+
+/** Variants set in Nunito ExtraBold; headline uses Nunito Bold. */
+export const SERIF_VARIANTS = ['display', 'title'] as const;
+export const ROUNDED_VARIANTS = ['headline'] as const;
 
 export const LANGUAGES: { code: string; label: string; english: string }[] = [
   { code: 'en', label: 'English', english: 'English' },
@@ -80,10 +120,17 @@ export function feastTimeLabel(hour: number) {
   return `${h} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
-/** Soft, warm avatar grounds. Chosen by name so each person keeps their colour. */
-const AVATAR_TONES = ['#F3D9C6', '#E9DCC5', '#DCE3CF', '#D8E1E4', '#EBD3D6', '#E4D8EA', '#F1E2B9'];
-export function avatarTone(name: string) {
+/** Bright avatar grounds. Chosen by name so each person keeps their colour. */
+const AVATAR_TONES = ['#EFAE3A', '#EE9F7E', '#9CC7A6', '#93C3CB', '#D9A9BE', '#E8875F', '#E3C27E'];
+function nameHash(name: string) {
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_TONES[hash % AVATAR_TONES.length];
+  return hash;
+}
+export function avatarTone(name: string) {
+  return AVATAR_TONES[nameHash(name) % AVATAR_TONES.length];
+}
+/** The pop colour that belongs to a person, for tiles and accents around their moments. */
+export function popFor(name: string) {
+  return Pop[nameHash(name) % Pop.length];
 }

@@ -27,7 +27,7 @@ function close() {
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <View style={[styles.root, { justifyContent: 'center' }]}>
-      <StateView dark icon="retry" title="This clip did not load" body="Check your connection and try again." action={<Button label="Try again" onPress={() => void retry()} />} />
+      <StateView dark mascot="wow" title="This clip did not load" body="Check your connection and try again." action={<Button label="Try again" onPress={() => void retry()} />} />
       <Button kind="onDark" label="Close" onPress={close} />
     </View>
   );

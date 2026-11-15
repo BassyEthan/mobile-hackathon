@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Button, Chip, Field, IconButton, LinkButton, Txt } from '@/components/ui';
-import { Color, FEAST_TIMES, Font, LANGUAGES, Radius, Space } from '@/constants/dumpling';
+import { DumplingLogo, LogoMark } from '@/components/logo';
+import { Button, Chip, Field, IconButton, Txt } from '@/components/ui';
+import { Color, FEAST_TIMES, Font, LANGUAGES, Radius, Space, Stroke } from '@/constants/dumpling';
 import { dayOfMonth, weekday, type Me, useSession } from '@/lib/session';
 import { api } from '../../convex/_generated/api';
 
@@ -26,9 +27,9 @@ export function DayStrip({ days, selected, today, onSelect }: { days: { date: st
             accessibilityLabel={`${isToday ? 'Today' : weekday(d.date, 'long')}, ${d.clips} ${d.clips === 1 ? 'moment' : 'moments'}`}
             onPress={() => onSelect(d.date)}
             style={({ pressed }) => [styles.day, on && styles.dayOn, pressed && { opacity: 0.7 }]}>
-            <Text maxFontSizeMultiplier={1.3} style={[styles.dayName, on && { color: Color.brandDeep }]}>{isToday ? 'Today' : weekday(d.date)}</Text>
-            <Text maxFontSizeMultiplier={1.3} style={[styles.dayNum, on && { color: Color.brandDeep }]}>{dayOfMonth(d.date)}</Text>
-            <View style={[styles.dayDot, { opacity: d.clips > 0 ? 1 : 0 }, d.mine && { backgroundColor: Color.brand }]} />
+            <Text maxFontSizeMultiplier={1.3} style={[styles.dayName, on && { color: Color.surface }]}>{isToday ? 'Today' : weekday(d.date)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.dayNum, on && { color: Color.surface }]}>{dayOfMonth(d.date)}</Text>
+            <View style={[styles.dayDot, { opacity: d.clips > 0 ? 1 : 0 }, d.mine && { backgroundColor: Color.sun }]} />
           </Pressable>
         );
       })}
@@ -56,29 +57,51 @@ export function SparkCard({
   onAsk: () => void;
 }) {
   return (
-    <View style={styles.spark} testID="spark-card">
-      <View style={styles.eyebrow}>
-        <Icon name="spark" size={16} color={Color.brand} />
-        <Txt variant="eyebrow">Today’s spark</Txt>
-        {sealed && (
-          <View style={styles.sealed} testID="spark-sealed">
-            <Icon name="lock" size={12} color={Color.goldDeep} />
-            <Txt variant="caption" style={{ color: Color.goldDeep }}>Sealed until Sunday</Txt>
+    <View style={{ gap: Space.md }}>
+      <View style={styles.spark} testID="spark-card">
+        <View style={styles.sparkLogo} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <DumplingLogo size={70} />
+        </View>
+        <View style={styles.eyebrow}>
+          <View style={styles.sparkBadge}>
+            <Icon name="spark" size={14} color={Color.ink} />
+            <Text maxFontSizeMultiplier={1.3} style={styles.sparkBadgeText}>TODAY’S SPARK</Text>
           </View>
-        )}
+          {sealed && (
+            <View style={styles.sealed} testID="spark-sealed">
+              <Icon name="lock" size={12} color={Color.nightText} />
+              <Txt variant="caption" style={{ color: Color.nightText, fontWeight: '700' }}>Sealed till Sunday</Txt>
+            </View>
+          )}
+        </View>
+        <Pressable accessibilityRole="button" accessibilityHint="Fold an answer to this spark" onPress={onFold}>
+          <Txt variant="display" testID="spark-text" style={{ fontSize: 27, lineHeight: 33, letterSpacing: -0.3 }}>{text}</Txt>
+        </Pressable>
+        {author && <Txt variant="meta" testID="spark-author" style={{ color: Color.ink, opacity: 0.7 }}>{author}</Txt>}
+        <View style={styles.sparkActions}>
+          <View style={{ flex: 1 }}>
+            <Button testID="fold-spark" icon="video" label="Fold this" onPress={onFold} />
+          </View>
+          {canShuffle && (
+            <Pressable
+              testID="next-spark"
+              accessibilityRole="button"
+              accessibilityLabel="Need a spark? Show another"
+              onPress={onShuffle}
+              style={({ pressed }) => [styles.shuffle, pressed && styles.pressedChunk]}>
+              <Icon name="shuffle" size={22} color={Color.ink} />
+            </Pressable>
+          )}
+        </View>
       </View>
-      <Pressable accessibilityRole="button" accessibilityHint="Fold an answer to this spark" onPress={onFold}>
-        <Txt variant="title" testID="spark-text" style={{ fontWeight: '500' }}>{text}</Txt>
+      <Pressable testID="ask-the-table" accessibilityRole="button" accessibilityLabel="Ask the Table" onPress={onAsk} style={({ pressed }) => [styles.askRow, pressed && styles.pressedChunk]}>
+        <LogoMark size={44} />
+        <View style={{ flex: 1 }}>
+          <Txt variant="headline" style={{ fontSize: 16, lineHeight: 21 }}>Ask the Table</Txt>
+          <Txt variant="meta" style={{ color: Color.ink, opacity: 0.7 }}>Curious about someone? Send them a question.</Txt>
+        </View>
+        <Icon name="chevron" size={20} color={Color.ink} />
       </Pressable>
-      {author && <Txt variant="meta" testID="spark-author">{author}</Txt>}
-      <View style={styles.sparkActions}>
-        <LinkButton testID="fold-spark" icon="arrow" label="Fold this" onPress={onFold} />
-        {canShuffle && <LinkButton testID="next-spark" icon="shuffle" tone="soft" label="Need a spark?" onPress={onShuffle} />}
-      </View>
-      <View style={styles.askRow}>
-        <Txt variant="meta" style={{ flexShrink: 1 }}>Curious about someone?</Txt>
-        <LinkButton testID="ask-the-table" icon="ask" label="Ask the Table" onPress={onAsk} />
-      </View>
     </View>
   );
 }
@@ -87,13 +110,13 @@ export function SparkCard({
 
 export function AskedCard({ ask, onFold }: { ask: { authorName: string; text: string }; onFold: () => void }) {
   return (
-    <View style={styles.card} testID="asked-card">
+    <View style={[styles.card, { backgroundColor: Color.pinkSoft }]} testID="asked-card">
       <View style={styles.eyebrow}>
-        <Icon name="ask" size={16} color={Color.brandDeep} />
-        <Txt variant="eyebrow">{ask.authorName} asked you</Txt>
+        <Icon name="ask" size={16} color={Color.ink} />
+        <Txt variant="eyebrow" style={{ color: Color.ink }}>{ask.authorName} asked you</Txt>
       </View>
-      <Txt variant="headline" style={{ fontWeight: '500' }}>“{ask.text}”</Txt>
-      <LinkButton icon="video" label="Fold an answer" onPress={onFold} />
+      <Txt variant="title" style={{ fontSize: 22, lineHeight: 29, fontFamily: Font.italic, fontStyle: 'italic', fontWeight: '700' }}>“{ask.text}”</Txt>
+      <Button kind="secondary" icon="video" label="Fold an answer" onPress={onFold} />
     </View>
   );
 }
@@ -140,9 +163,9 @@ export function ReflectionCard({ which }: { which: ReflectionKey }) {
     sundayTime: 'When does your Sunday slow down?',
   }[which];
   return (
-    <View style={styles.card} testID={`reflection-${which}`}>
+    <View style={[styles.card, { backgroundColor: Color.grapeSoft }]} testID={`reflection-${which}`}>
       <View style={styles.eyebrow}>
-        <Txt variant="eyebrow" style={{ flex: 1 }}>A little about you</Txt>
+        <Txt variant="eyebrow" style={{ flex: 1, color: Color.ink }}>A little about you</Txt>
         <IconButton icon="close" size={18} label="Not now" onPress={() => void done({ ...auth, key: which })} />
       </View>
       <Txt variant="headline">{question}</Txt>
@@ -179,18 +202,25 @@ export function ReflectionCard({ which }: { which: ReflectionKey }) {
   );
 }
 
+const chunk = { borderWidth: Stroke.line, borderBottomWidth: Stroke.lip, borderColor: Color.ink } as const;
+
 const styles = StyleSheet.create({
-  strip: { flexDirection: 'row', gap: 4 },
-  day: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 8, borderRadius: Radius.chip, minHeight: 64 },
-  dayOn: { backgroundColor: Color.brandTint },
-  dayName: { fontSize: 11, fontWeight: '600', color: Color.textSoft, fontFamily: Font.ui },
-  dayNum: { fontSize: 17, fontWeight: '600', color: Color.text, fontFamily: Font.ui },
-  dayDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Color.borderStrong },
-  spark: { gap: Space.sm, paddingTop: Space.xs },
+  strip: { flexDirection: 'row', gap: 6 },
+  day: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 8, borderRadius: 14, minHeight: 70, backgroundColor: Color.surface, borderWidth: 1.5, borderColor: Color.ink },
+  dayOn: { backgroundColor: Color.brand, borderBottomWidth: Stroke.lip },
+  dayName: { fontSize: 11, fontWeight: '700', color: Color.textSoft, fontFamily: Font.brand },
+  dayNum: { fontSize: 19, fontWeight: '800', color: Color.ink, fontFamily: Font.display },
+  dayDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: Color.ink },
+  spark: { gap: Space.md, padding: Space.xl, borderRadius: Radius.card, backgroundColor: Color.goldSoft, ...chunk },
   eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 24 },
-  sealed: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: Color.goldSoft },
-  sparkActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.xl },
-  askRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: Space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderColor: Color.border, marginTop: Space.xs },
-  card: { backgroundColor: Color.surface, borderRadius: Radius.card, borderWidth: 1, borderColor: Color.border, padding: Space.lg, gap: Space.md },
+  sparkBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Color.surface, borderWidth: 1.5, borderColor: Color.ink, borderRadius: Radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  sparkBadgeText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: Color.ink, fontFamily: Font.display },
+  sealed: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, backgroundColor: Color.ink },
+  sparkLogo: { position: 'absolute', top: -22, right: 14, transform: [{ rotate: '8deg' }] },
+  sparkActions: { flexDirection: 'row', alignItems: 'center', gap: Space.sm, marginTop: Space.xs },
+  shuffle: { width: 54, height: 54, borderRadius: 20, backgroundColor: Color.surface, ...chunk, alignItems: 'center', justifyContent: 'center' },
+  pressedChunk: { borderBottomWidth: Stroke.line, transform: [{ translateY: Stroke.lip - Stroke.line }] },
+  askRow: { flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.md, borderRadius: Radius.tile, backgroundColor: Color.skySoft, ...chunk },
+  card: { backgroundColor: Color.surface, borderRadius: Radius.card, ...chunk, padding: Space.lg, gap: Space.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
