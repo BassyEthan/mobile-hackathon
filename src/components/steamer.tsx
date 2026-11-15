@@ -72,7 +72,7 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
       </View>
       {!lidOff ? (
         <Card style={styles.lid}>
-          
+
           <Txt variant="title" style={{ textAlign: 'center' }}>
             Your day belongs here.
           </Txt>

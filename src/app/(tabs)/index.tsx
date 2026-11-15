@@ -61,7 +61,7 @@ export default function Today() {
   return (
     <Screen bottomInset={BottomTabInset}>
       <View style={styles.header}>
-        
+
         <View style={{ flex: 1 }}>
           <Txt variant="small" style={{ marginBottom: 8 }}>{me.tableName}</Txt>
           <Txt variant="hero">{new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'},{'\n'}{me.displayName}.</Txt>
