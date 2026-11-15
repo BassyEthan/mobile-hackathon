@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { ensureFillingFor } from "./schedule";
-import { dateInZone, isDate, isFillingOpen, requireMember, sessionArgs } from "./lib";
+import { addDays, dateInZone, isDate, isFillingOpen, requireMember, sessionArgs, weekOfFor } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -55,17 +55,35 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
   };
 }
 
+async function tableStreak(ctx: QueryCtx, tableId: Doc<"tables">["_id"], week: string) {
+  let streak = 0;
+  let expectedWeek = week;
+  const feasts = ctx.db.query("feasts").withIndex("by_tableId_and_weekOf", (q) =>
+    q.eq("tableId", tableId).lte("weekOf", week),
+  ).order("desc");
+  for await (const feast of feasts) {
+    if (feast.status !== "ready" || feast.weekOf > expectedWeek) continue;
+    if (streak === 0 && feast.weekOf === addDays(week, -7)) expectedWeek = feast.weekOf;
+    if (feast.weekOf !== expectedWeek) break;
+    streak++;
+    expectedWeek = addDays(expectedWeek, -7);
+  }
+  return streak;
+}
+
 export const get = query({
   args: { ...sessionArgs, date: v.string() },
   returns: v.object({
     filling: v.union(v.null(), v.object({ id: v.id("fillings"), date: v.string(), prompt: v.string() })),
     members: v.array(v.object({ id: v.id("members"), displayName: v.string(), folded: v.boolean(), isMe: v.boolean() })),
     lidOff: v.boolean(),
+    streak: v.number(),
     dumplings: v.array(revealedDumpling),
   }),
   handler: async (ctx, args) => {
     const { member, table } = await requireMember(ctx, args);
     const members = await ctx.db.query("members").withIndex("by_tableId", (q) => q.eq("tableId", table._id)).take(50);
+    const streak = await tableStreak(ctx, table._id, weekOfFor(dateInZone(Date.now(), table.timeZone)));
     const filling = isDate(args.date)
       ? await ctx.db
           .query("fillings")
@@ -77,6 +95,7 @@ export const get = query({
         filling: null,
         members: members.map((m) => ({ id: m._id, displayName: m.displayName, folded: false, isMe: m._id === member._id })),
         lidOff: false,
+        streak,
         dumplings: [],
       };
     }
@@ -88,7 +107,7 @@ export const get = query({
         .first();
       if (dumpling) folded.set(m._id, dumpling);
     }
-    const lidOff = folded.has(member._id) || !(await isFillingOpen(ctx, filling));
+    const lidOff = (members.length > 1 && folded.has(member._id)) || !(await isFillingOpen(ctx, filling));
     const dumplings = [];
     if (lidOff) {
       for (const dumpling of [...folded.values()].sort((a, b) => a.createdAt - b.createdAt)) {
@@ -104,6 +123,7 @@ export const get = query({
         isMe: m._id === member._id,
       })),
       lidOff,
+      streak,
       dumplings,
     };
   },

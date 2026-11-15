@@ -42,6 +42,8 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
   }, [lidOff]);
 
   const folded = members.filter((m) => m.folded);
+  const waiting = members.filter((m) => !m.isMe && !m.folded).map((m) => m.displayName);
+  const waitingForFamily = members.length === 1 && folded.length === 1;
   return (
     <View style={{ gap: 14 }}>
       <Card>
@@ -62,7 +64,11 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
           {folded.length === 0
             ? 'Nobody has folded yet. The steamer is warm.'
             : `${folded.length} of ${members.length} folded today.`}
+          {waitingForFamily ? ' Waiting on your family.' : ''}
         </Txt>
+        {waiting.length > 0 && (
+          <Txt variant="small" testID="steamer-waiting">Waiting on {waiting.join(', ')}.</Txt>
+        )}
       </Card>
       {!lidOff ? (
         <Card style={styles.lid}>
@@ -70,7 +76,9 @@ export function Steamer({ members, lidOff, dumplings }: { members: Member[]; lid
           <Txt variant="title" style={{ textAlign: 'center' }}>
             The lid is on
           </Txt>
-          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>Fold today&apos;s Filling to see everyone&apos;s.</Txt>
+          <Txt style={{ textAlign: 'center', color: Palette.inkSoft }}>
+            {waitingForFamily ? 'Invite someone to your Table to lift the lid.' : "Fold today's Filling to see everyone's."}
+          </Txt>
         </Card>
       ) : (
         dumplings.map((d, i) => (
