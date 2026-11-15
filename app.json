@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "mobile-hackathon",
+    "name": "Dumpling",
     "slug": "mobile-hackathon",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobilehackathon",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.bassyethan.mobilehackathon"
@@ -30,15 +30,32 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFF6E9",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      "expo-video",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Dumpling uses the camera to record your ten-second Fold.",
+          "microphonePermission": "Dumpling uses the microphone for your Fold and voice reactions.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Dumpling uses the microphone for your Fold and voice reactions."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "backgroundColor": "#FFF6E9"
   }
 }
