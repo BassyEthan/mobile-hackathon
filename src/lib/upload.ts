@@ -19,7 +19,12 @@ export async function uploadToConvex(
     headers: { 'Content-Type': contentType },
     sessionType: 'foreground',
     onProgress: ({ bytesSent, totalBytes }) => {
-      if (totalBytes > 0) onProgress(bytesSent / totalBytes);
+      // The native upload callback can deliver these counters as BigInts.
+      const sent = Number(bytesSent);
+      const total = Number(totalBytes);
+      if (Number.isFinite(sent) && Number.isFinite(total) && total > 0) {
+        onProgress(Math.min(1, Math.max(0, sent / total)));
+      }
     },
   });
   if (result.status < 200 || result.status >= 300) throw new Error(`Upload failed (${result.status})`);
