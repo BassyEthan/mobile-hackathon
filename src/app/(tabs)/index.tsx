@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from 'convex/react';
 import * as Haptics from 'expo-haptics';
-import { router, useFocusEffect, type ErrorBoundaryProps } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,7 +13,7 @@ import { DumplingLoader } from '@/components/loader';
 import { Sheet } from '@/components/sheet';
 import { Steamer } from '@/components/steamer';
 import { AskedCard, DayStrip, ReflectionCard, SparkCard, nextReflection } from '@/components/today-parts';
-import { Banner, Button, Card, Loading, Screen, StateView, Txt } from '@/components/ui';
+import { Banner, Button, Card, LinkButton, Loading, Screen, StateView, Txt } from '@/components/ui';
 import { Color, Font, Radius, Space } from '@/constants/dumpling';
 import { shareInvite } from '@/lib/invite';
 import { enableNotifications } from '@/lib/notifications';
@@ -45,6 +45,18 @@ export default function Today() {
   const insets = useSafeAreaInsets();
   const today = useToday(me?.timeZone);
   const [selected, setSelected] = useState<string | null>(null);
+  // The calendar opens a day by navigating here with ?date=YYYY-MM-DD.
+  const params = useLocalSearchParams<{ date?: string }>();
+  const [openedFromCalendar, setOpenedFromCalendar] = useState<string | undefined>();
+  if (params.date && today && params.date !== openedFromCalendar) {
+    setOpenedFromCalendar(params.date);
+    setSelected(params.date === today ? null : params.date);
+  }
+  if (!params.date && openedFromCalendar) setOpenedFromCalendar(undefined);
+  // Clear the param once applied, so picking the same day from the calendar again still works.
+  useEffect(() => {
+    if (params.date && params.date === openedFromCalendar) router.setParams({ date: undefined });
+  }, [params.date, openedFromCalendar]);
   const date = selected ?? today;
   const isToday = date === today;
   const day = useQuery(api.today.get, auth && date ? { ...auth, date } : 'skip');
@@ -105,7 +117,8 @@ export default function Today() {
   const latestReady = feasts?.find((f) => f.status === 'ready');
   const alone = day.members.length <= 1;
   const reflection = isToday ? nextReflection(me) : null;
-  const ask = isToday ? asked?.[0] : undefined;
+  // A question leaves the moment its answer is folded, even while the clip is still sending.
+  const ask = isToday ? asked?.find((a) => !outbox.items.some((i) => i.params.askId === a.id)) : undefined;
 
   const fold = (extra?: { fillingId: string; sparkKey: string; prompt: string }) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -132,11 +145,26 @@ export default function Today() {
       <Screen header={<TableHeader subtitle={greeting(me.nickname ?? me.displayName)} />} gap={Space.xl} bottomInset={me.isElder ? 96 : 0}>
         {!outbox.online && <Banner icon="offline" title="You’re offline" detail="Anything you fold will send when you’re back." testID="offline-banner" />}
 
-        {week && <DayStrip days={week} selected={date} today={today} onSelect={(d) => setSelected(d === today ? null : d)} />}
+        <View style={{ gap: Space.sm }}>
+          {week && <DayStrip days={week} selected={date} today={today} onSelect={(d) => setSelected(d === today ? null : d)} />}
+          <View style={styles.calendarRow}>
+            {!isToday && <LinkButton testID="back-to-today" icon="back" tone="soft" label="Back to today" onPress={() => setSelected(null)} />}
+            <View style={{ flex: 1 }} />
+            <LinkButton testID="open-calendar" icon="calendar" label="Full calendar" onPress={() => router.push('/calendar')} />
+          </View>
+        </View>
 
         {banner}
 
-        {ask && <AskedCard ask={ask} onFold={() => fold()} />}
+        {ask && (
+          <AskedCard
+            ask={ask}
+            onFold={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({ pathname: '/fold', params: { askId: ask.id, prompt: ask.text } });
+            }}
+          />
+        )}
 
         {isToday ? (
           <SparkCard
@@ -185,7 +213,7 @@ export default function Today() {
             onRetry={outbox.retry}
             onDiscard={outbox.discard}
           />
-          {date === addDays(today, -6) && <Txt variant="meta" style={{ textAlign: 'center' }}>Older moments live in the Feast.</Txt>}
+          {date === addDays(today, -6) && <LinkButton icon="calendar" label="See earlier days in the calendar" onPress={() => router.push('/calendar')} />}
         </View>
 
         {/* Getting-to-know-you questions are optional, so they sit after the family's moments. */}
@@ -227,6 +255,7 @@ export default function Today() {
 
 const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  calendarRow: { flexDirection: 'row', alignItems: 'center', minHeight: 36 },
   elderBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: Space.gutter, paddingTop: Space.md, gap: Space.sm, backgroundColor: Color.bg, borderTopWidth: StyleSheet.hairlineWidth, borderColor: Color.border },
   elderRecord: { minHeight: 76, borderRadius: Radius.card, backgroundColor: Color.brand, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Space.md },
   elderText: { color: Color.surface, fontSize: 22, fontWeight: '600', fontFamily: Font.ui },

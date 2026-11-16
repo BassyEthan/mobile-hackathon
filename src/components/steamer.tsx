@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -18,17 +19,19 @@ export type Clip = {
   id: Id<'dumplings'>;
   memberId: Id<'members'>;
   memberName: string;
-  mediaType: 'video' | 'audio';
+  memberAvatarUrl: string | null;
+  mediaType: 'video' | 'audio' | 'photo';
   url: string | null;
   caption: string | null;
   createdAt: number;
   spark: string | null;
+  askedBy?: string | null;
   replyTo: Id<'dumplings'> | null;
   replyToName: string | null;
   reactions: ReactionSummary;
 };
 
-type Member = { id: string; displayName: string; folded: boolean; isMe: boolean };
+type Member = { id: string; displayName: string; avatarUrl: string | null; folded: boolean; isMe: boolean };
 
 /** Threads stay together: each clip is followed by the replies folded back to it. */
 export function threadOrder<T extends { id: string; replyTo: string | null; createdAt: number }>(clips: T[]) {
@@ -87,12 +90,14 @@ export function ClipTile({ clip, width, onPress, autoplay }: { clip: Clip; width
       testID={`clip-${clip.id}`}
       accessibilityRole="button"
       accessibilityLabel={`${clip.memberName}${clip.replyToName ? `, folding back to ${clip.replyToName}` : ''}, ${time(clip.createdAt)}${clip.caption ? `. ${clip.caption}` : ''}`}
-      accessibilityHint="Opens full screen with sound"
+      accessibilityHint={clip.mediaType === 'photo' ? 'Opens full screen' : 'Opens full screen with sound'}
       onPress={onPress}
       style={({ pressed }) => [{ width, gap: Space.sm }, pressed && { transform: [{ scale: 0.97 }] }]}>
       <View style={[styles.media, { height: width * 1.3, backgroundColor: popFor(clip.memberName).soft }]}>
         {clip.mediaType === 'video' && clip.url ? (
           <MutedVideo url={clip.url} play={autoplay} />
+        ) : clip.mediaType === 'photo' && clip.url ? (
+          <Image source={{ uri: clip.url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
         ) : (
           <View style={styles.audio}>
             <View style={[styles.voiceBlob, { backgroundColor: popFor(clip.memberName).fill }]}><Icon name="voice" size={28} color={Color.ink} /></View>
@@ -112,12 +117,15 @@ export function ClipTile({ clip, width, onPress, autoplay }: { clip: Clip; width
           </View>
         )}
       </View>
-      <View style={{ gap: 1, paddingHorizontal: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingHorizontal: 2 }}>
+        <Avatar name={clip.memberName} uri={clip.memberAvatarUrl} size={28} />
+        <View style={{ flex: 1, gap: 1 }}>
         <Txt variant="headline" numberOfLines={1} style={{ fontSize: 16, lineHeight: 21 }}>{clip.memberName}</Txt>
         <Txt variant="caption" numberOfLines={1}>
           {time(clip.createdAt)}
-          {clip.caption && clip.mediaType === 'video' ? ` · ${clip.caption}` : ''}
+          {clip.caption && clip.mediaType !== 'audio' ? ` · ${clip.caption}` : ''}
         </Txt>
+        </View>
       </View>
     </Pressable>
   );
@@ -185,6 +193,31 @@ export function Steamer({
   const names = folded.map((m) => m.displayName);
   const who = names.length === 0 ? null : names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
+  // A past day you did not fold stays closed: you can only fold into today.
+  if (!lidOff && !isToday) {
+    return (
+      <View style={[styles.lid, { alignItems: 'center' }]} testID="steamer-locked-day">
+        <Mascot size={64} steaming={false} />
+        <View style={{ gap: 4, alignItems: 'center' }}>
+          <Txt variant="headline" style={{ textAlign: 'center' }}>{who ? `${who} folded this day` : 'A quiet day'}</Txt>
+          <Txt variant="meta" style={{ textAlign: 'center' }}>
+            {who ? 'You didn’t fold this day, so its moments stay under the lid. They still play in the Sunday Feast.' : 'Nobody folded on this day.'}
+          </Txt>
+        </View>
+        {folded.length > 0 && (
+          <View style={[styles.seats, { justifyContent: 'center' }]}>
+            {folded.map((m) => (
+              <View key={m.id} style={styles.seat}>
+                <Avatar name={m.displayName} uri={m.avatarUrl} size={40} folded />
+                <Txt variant="caption" numberOfLines={1} style={{ color: Color.text }}>{m.displayName}</Txt>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   if (!lidOff) {
     const sending = pending.length > 0;
     return (
@@ -208,7 +241,7 @@ export function Steamer({
           <View style={styles.seats}>
             {folded.map((m) => (
               <View key={m.id} style={styles.seat}>
-                <Avatar name={m.displayName} size={40} folded />
+                <Avatar name={m.displayName} uri={m.avatarUrl} size={40} folded />
                 <Txt variant="caption" numberOfLines={1} style={{ color: Color.text }}>{m.displayName}</Txt>
               </View>
             ))}

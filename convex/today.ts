@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { ensureFillingFor, markToday } from "./schedule";
-import { addDays, canSeeDumpling, currentDay, dateInZone, fillingHiddenFrom, isDate, isDayOpen, requireMember, sessionArgs, sparksFor, tableMembers, weekOfFor } from "./lib";
+import { addDays, avatarUrlFor, canSeeDumpling, currentDay, dateInZone, fillingHiddenFrom, isDate, requireMember, sessionArgs, sparksFor, tableMembers, weekOfFor } from "./lib";
 
 const reactionSummary = v.object({
   counts: v.record(v.string(), v.number()),
@@ -15,17 +15,34 @@ export const revealedDumpling = v.object({
   id: v.id("dumplings"),
   memberId: v.id("members"),
   memberName: v.string(),
-  mediaType: v.union(v.literal("video"), v.literal("audio")),
+  memberAvatarUrl: v.union(v.string(), v.null()),
+  mediaType: v.union(v.literal("video"), v.literal("audio"), v.literal("photo")),
   url: v.union(v.string(), v.null()),
   caption: v.union(v.string(), v.null()),
   createdAt: v.number(),
   spark: v.union(v.string(), v.null()),
+  // Who asked, when the clip answers a family member's question directly.
+  askedBy: v.union(v.string(), v.null()),
   replyTo: v.union(v.id("dumplings"), v.null()),
   replyToName: v.union(v.string(), v.null()),
   allowShare: v.boolean(),
   sealed: v.boolean(),
   reactions: reactionSummary,
 });
+
+async function askerOf(ctx: QueryCtx, dumpling: Doc<"dumplings">) {
+  if (dumpling.askId) {
+    const ask = await ctx.db.get("askQueue", dumpling.askId);
+    const author = ask ? await ctx.db.get("members", ask.authorId) : null;
+    if (author) return author.displayName;
+  }
+  if (dumpling.fillingId && dumpling.sparkKey === "primary") {
+    const filling = await ctx.db.get("fillings", dumpling.fillingId);
+    const author = filling?.authorId ? await ctx.db.get("members", filling.authorId) : null;
+    if (author) return author.displayName;
+  }
+  return null;
+}
 
 export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, dumpling: Doc<"dumplings">) {
   const author = await ctx.db.get("members", dumpling.memberId);
@@ -54,11 +71,13 @@ export async function describeDumpling(ctx: QueryCtx, viewer: Doc<"members">, du
     id: dumpling._id,
     memberId: dumpling.memberId,
     memberName: author?.displayName ?? "Someone",
+    memberAvatarUrl: await avatarUrlFor(ctx, author),
     mediaType: dumpling.mediaType,
     url: await ctx.storage.getUrl(dumpling.mediaStorageId),
     caption: dumpling.translation?.[viewer.language] ?? dumpling.transcript ?? null,
     createdAt: dumpling.createdAt,
     spark: dumpling.hiddenFrom?.includes(viewer._id) ? null : (dumpling.sparkText ?? null),
+    askedBy: await askerOf(ctx, dumpling),
     replyTo: parent?._id ?? null,
     replyToName: parent ? (parentAuthor?.displayName ?? "Someone") : null,
     allowShare: dumpling.allowShare ?? false,
@@ -87,7 +106,7 @@ export const get = query({
         addressedToName: v.union(v.string(), v.null()),
       }),
     ),
-    members: v.array(v.object({ id: v.id("members"), displayName: v.string(), folded: v.boolean(), isMe: v.boolean() })),
+    members: v.array(v.object({ id: v.id("members"), displayName: v.string(), avatarUrl: v.union(v.string(), v.null()), folded: v.boolean(), isMe: v.boolean() })),
     lidOff: v.boolean(),
     week: v.number(),
     dumplings: v.array(revealedDumpling),
@@ -111,7 +130,8 @@ export const get = query({
     const folded = new Set(
       todays.filter((d) => d.memberId === member._id || (!d.sealed && !d.hiddenFrom?.includes(member._id))).map((d) => d.memberId),
     );
-    const lidOff = folded.has(member._id) || !(await isDayOpen(ctx, table, date));
+    // Fold to see: a day's moments open only once you have added your own to that day, past days included.
+    const lidOff = folded.has(member._id);
     const nameOf = (id: Doc<"members">["_id"] | undefined) => (id ? (members.find((m) => m._id === id)?.displayName ?? null) : null);
     const dumplings = [];
     if (lidOff) {
@@ -130,12 +150,15 @@ export const get = query({
             addressedToName: nameOf(filling.addressedTo),
           }
         : null,
-      members: members.map((m) => ({
-        id: m._id,
-        displayName: m.displayName,
-        folded: folded.has(m._id),
-        isMe: m._id === member._id,
-      })),
+      members: await Promise.all(
+        members.map(async (m) => ({
+          id: m._id,
+          displayName: m.displayName,
+          avatarUrl: await avatarUrlFor(ctx, m),
+          folded: folded.has(m._id),
+          isMe: m._id === member._id,
+        })),
+      ),
       lidOff,
       week: tableWeek(table, date),
       dumplings,
@@ -172,6 +195,34 @@ export const week = query({
   },
 });
 
+/**
+ * The calendar: every day from `from` to `to` (at most 42, one month grid), with how many moments each holds and
+ * whether you folded. Also returns the first day of the Table, so the calendar never offers days before it existed.
+ */
+export const range = query({
+  args: { ...sessionArgs, from: v.string(), to: v.string() },
+  returns: v.object({
+    start: v.string(),
+    days: v.array(v.object({ date: v.string(), clips: v.number(), mine: v.boolean() })),
+  }),
+  handler: async (ctx, args) => {
+    const { member, table } = await requireMember(ctx, args);
+    const start = dateInZone(table.createdAt, table.timeZone);
+    if (!isDate(args.from) || !isDate(args.to) || args.to < args.from) return { start, days: [] };
+    const to = args.to > addDays(args.from, 41) ? addDays(args.from, 41) : args.to;
+    const rows = await ctx.db
+      .query("dumplings")
+      .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", args.from).lte("date", to))
+      .take(2000);
+    const days = [];
+    for (let date = args.from; date <= to; date = addDays(date, 1)) {
+      const day = rows.filter((d) => d.date === date);
+      days.push({ date, clips: day.length, mine: day.some((d) => d.memberId === member._id) });
+    }
+    return { start, days };
+  },
+});
+
 /** Questions a family member asked you directly, so "Maya asked you something" opens the actual question. */
 export const asksForMe = query({
   args: sessionArgs,
@@ -185,7 +236,7 @@ export const asksForMe = query({
       .take(30);
     const rows = [];
     for (const a of pending) {
-      if (a.addressedTo !== member._id) continue;
+      if (a.addressedTo !== member._id || a.answeredBy) continue;
       const author = await ctx.db.get("members", a.authorId);
       rows.push({ id: a._id, authorName: author?.displayName ?? "Someone", text: a.text, createdAt: a.createdAt });
     }

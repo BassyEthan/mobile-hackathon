@@ -7,6 +7,7 @@ import type { Id } from "./_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { segment } from "./schema";
 import { SAFE_SPARKS, seatLine } from "./lib";
+import { pickHighlight } from "./ai";
 
 type Segment = Infer<typeof segment>;
 type Gathered = NonNullable<FunctionReturnType<typeof internal.feasts.gather>>;
@@ -32,12 +33,39 @@ export function findSupercut(data: Gathered) {
 export function withSupercut(segments: Segment[], supercut: ReturnType<typeof findSupercut>): Segment[] {
   if (!supercut) return segments;
   const at = segments.findIndex((s) => s.type === "award" || s.type === "secretIngredient");
-  const cut: Segment[] = [
-    { type: "titleCard", title: "Supercut", subtitle: supercut.prompt },
-    ...supercut.clips.map((c) => ({ type: "clip" as const, dumplingId: c.id })),
-  ];
-  return [...segments.slice(0, at), ...cut, ...segments.slice(at)];
+  const cut: Segment = { type: "montage", title: "Supercut", subtitle: supercut.prompt, dumplingIds: reelOrder(supercut.clips).map((c) => c.id) };
+  return [...segments.slice(0, at), cut, ...segments.slice(at)];
 }
+
+/** A reel builds: the quieter bites first, the most loved one last. */
+export function reelOrder(clips: Gathered["clips"]) {
+  return [...clips].sort((a, b) => a.reactionCount - b.reactionCount || a.date.localeCompare(b.date));
+}
+
+/**
+ * Every Feast opens the same way: slide one is the Chef's introduction, slide two is the Highlight Reel. Everything
+ * else (Last Week, Mother Tongue, the award, the send-off) follows. A separate intro line before the reel is folded away.
+ */
+export function introThenReel(segments: Segment[]): Segment[] {
+  const reelAt = segments.findIndex((s) => s.type === "montage");
+  const introAt = segments.findIndex((s) => s.type === "hostLine");
+  if (reelAt < 0 || introAt < 0) return segments;
+  const leadIn = reelAt - 1 !== introAt && segments[reelAt - 1]?.type === "hostLine" ? reelAt - 1 : -1;
+  const rest = segments.filter((_, i) => i !== reelAt && i !== introAt && i !== leadIn);
+  return [segments[introAt], segments[reelAt], ...rest];
+}
+
+/** The Golden Dumpling is the one clip that earns its full length, right after its award. */
+export function withEncore(segments: Segment[]): Segment[] {
+  const out: Segment[] = [];
+  for (const s of segments) {
+    out.push(s);
+    if (s.type === "award" && s.award === "Golden Dumpling" && s.dumplingId) out.push({ type: "clip", dumplingId: s.dumplingId });
+  }
+  return out;
+}
+
+const REEL_SIZE = 8;
 
 export function pickClips(data: Gathered, exclude: Set<string> = new Set()) {
   const byMember = new Map<string, Gathered["clips"]>();
@@ -48,10 +76,11 @@ export function pickClips(data: Gathered, exclude: Set<string> = new Set()) {
     byMember.set(clip.memberId, [...(byMember.get(clip.memberId) ?? []), clip]);
   }
   const picked: Gathered["clips"] = [];
-  while (picked.length < 6 && [...byMember.values()].some((list) => list.length > 0)) {
+  // Bites are short, so the reel can carry more of the week than full clips could.
+  while (picked.length < REEL_SIZE && [...byMember.values()].some((list) => list.length > 0)) {
     for (const list of byMember.values()) {
       const next = list.shift();
-      if (next && picked.length < 6) picked.push(next);
+      if (next && picked.length < REEL_SIZE) picked.push(next);
     }
   }
   return picked.sort((a, b) => a.date.localeCompare(b.date));
@@ -65,7 +94,12 @@ function withSeats(data: Gathered, segments: Segment[]): Segment[] {
 
 export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
   const segments: Segment[] = [
-    { type: "hostLine", text: `Welcome to ${data.tableName}, where the portions are small and the stories are not.` },
+    {
+      type: "hostLine",
+      text: clips.length > 0
+        ? `Welcome to ${data.tableName}, where the portions are small and the stories are not, so here is the week, one bite from everyone.`
+        : `Welcome to ${data.tableName}, where the portions are small and the stories are not.`,
+    },
   ];
   if (data.previous) {
     segments.push({ type: "titleCard", title: "Last Week", subtitle: data.previous.title });
@@ -73,10 +107,15 @@ export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
   if (clips.length === 0) {
     segments.push({ type: "hostLine", text: "The steamer was quiet this week, so the chef ate the leftovers." });
   }
-  clips.forEach((clip, i) => {
-    if (i % 2 === 0) segments.push({ type: "hostLine", text: clip.prompt ? `Here is ${clip.memberName}, answering "${clip.prompt}"` : `Here is ${clip.memberName}, folding whatever they liked.` });
-    segments.push({ type: "clip", dumplingId: clip.id });
-  });
+  if (clips.length > 0) {
+    const names = [...new Set(clips.map((c) => c.memberName))];
+    segments.push({
+      type: "montage",
+      title: "Highlight Reel",
+      subtitle: names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0],
+      dumplingIds: reelOrder(clips).map((c) => c.id),
+    });
+  }
   const foreign = data.clips.find((c) => c.language && c.language !== "en" && c.transcript && c.english);
   if (foreign) {
     segments.push({ type: "titleCard", title: "Mother Tongue", phrase: foreign.transcript!, meaning: foreign.english! });
@@ -99,9 +138,9 @@ export function templatePlan(data: Gathered, clips: Gathered["clips"]): Plan {
 const FLAT_SEGMENT = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "text", "translations", "dumplingId", "title", "subtitle", "phrase", "romanization", "meaning", "award", "memberName", "prompt"],
+  required: ["type", "text", "translations", "dumplingId", "dumplingIds", "title", "subtitle", "phrase", "romanization", "meaning", "award", "memberName", "prompt"],
   properties: {
-    type: { type: "string", enum: ["hostLine", "clip", "titleCard", "award", "secretIngredient"] },
+    type: { type: "string", enum: ["hostLine", "montage", "titleCard", "award", "secretIngredient"] },
     text: { type: ["string", "null"] },
     translations: {
       type: "array",
@@ -113,6 +152,7 @@ const FLAT_SEGMENT = {
       },
     },
     dumplingId: { type: ["string", "null"] },
+    dumplingIds: { type: "array", items: { type: "string" } },
     title: { type: ["string", "null"] },
     subtitle: { type: ["string", "null"] },
     phrase: { type: ["string", "null"] },
@@ -135,7 +175,7 @@ const PLAN_SCHEMA = {
   },
 };
 
-type Flat = Record<string, string | null> & { translations?: Array<{ language: string; text: string }> };
+type Flat = Record<string, string | null> & { translations?: Array<{ language: string; text: string }>; dumplingIds?: string[] };
 
 export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clips"]): Plan {
   const plan = raw as { title?: unknown; summary?: unknown; segments?: unknown };
@@ -159,12 +199,15 @@ export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clip
       const text = need("text");
       if (text.length > 220 || (text.match(/[.!?](\s|$)/g)?.length ?? 1) > 1) throw new Error("Chef lines must be one sentence");
       segments.push({ type: "hostLine", text, ...localized(s) });
-    } else if (s.type === "clip") {
-      const id = need("dumplingId");
-      if (!clipIds.has(id)) throw new Error(`Unknown clip ${id}`);
-      if (used.has(id)) throw new Error(`Clip ${id} used twice`);
-      used.add(id);
-      segments.push({ type: "clip", dumplingId: id as Id<"dumplings"> });
+    } else if (s.type === "montage") {
+      const ids = s.dumplingIds ?? [];
+      if (ids.length === 0) throw new Error("A montage needs dumplingIds");
+      for (const id of ids) {
+        if (!clipIds.has(id)) throw new Error(`Unknown clip ${id}`);
+        if (used.has(id)) throw new Error(`Clip ${id} used twice`);
+        used.add(id);
+      }
+      segments.push({ type: "montage", title: need("title"), ...(s.subtitle ? { subtitle: s.subtitle } : {}), dumplingIds: ids as Id<"dumplings">[] });
     } else if (s.type === "titleCard") {
       segments.push({
         type: "titleCard",
@@ -186,12 +229,13 @@ export function validatePlan(raw: unknown, data: Gathered, clips: Gathered["clip
     }
   }
   if (segments[0]?.type !== "hostLine") throw new Error("Start with a hostLine cold open");
-  if (used.size !== clipIds.size) throw new Error(`Use every one of the ${clipIds.size} selected clips exactly once`);
+  if (used.size !== clipIds.size) throw new Error(`Put every one of the ${clipIds.size} selected clips in the montage exactly once`);
+  if (segments.filter((s) => s.type === "montage").length > 1) throw new Error("Use one montage, the Highlight Reel");
   if (data.previous && !segments.some((s) => s.type === "titleCard" && s.title === "Last Week")) throw new Error("Include a Last Week titleCard");
   if (clips.some((c) => c.language && c.language !== "en") && !segments.some((s) => s.type === "titleCard" && s.title === "Mother Tongue" && s.phrase && s.meaning)) {
     throw new Error("Include a Mother Tongue titleCard with phrase, romanization and meaning");
   }
-  if (!segments.some((s) => s.type === "award" && s.award === "Golden Dumpling")) throw new Error("Include the Golden Dumpling award");
+  if (clips.length > 0 && !segments.some((s) => s.type === "award" && s.award === "Golden Dumpling")) throw new Error("Include the Golden Dumpling award");
   const last = segments[segments.length - 1];
   if (last?.type !== "secretIngredient" || segments.filter((s) => s.type === "secretIngredient").length !== 1) {
     throw new Error("End with exactly one secretIngredient");
@@ -281,10 +325,11 @@ async function aiPlan(data: Gathered, clips: Gathered["clips"]): Promise<Plan> {
       english: c.english,
       reactions: c.reactionCount,
       voiceReactions: c.voiceCount,
+      bestBite: c.highlight,
     })),
   };
   const instructions = `You are ${data.chefName}, host of a family's Sunday show called the Feast. Write the episode as an ordered list of segments.
-Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Use every clip in the brief exactly once as a clip segment by dumplingId, in an order that tells the week well, with short hostLine intros between some of them. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). Include award "Golden Dumpling" (most loved clip, set dumplingId). Never nudge or count anyone's folds. Clips marked sealed were hidden until tonight, so reveal them warmly. End with exactly one secretIngredient: next Monday's spark plus a one-line tease. The spark is twelve words or fewer, one concrete action doable in ten seconds anywhere, face optional, never a favorite, opinion or summary of the day, and never a yes or no question. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null. summary is two sentences for the family's memory.`;
+Rules: start with a hostLine cold open. If lastWeek is not null, include a titleCard titled exactly "Last Week" with a subtitle recapping it, using a callback when one fits. Nobody watches whole clips: the week plays as one montage segment, the Highlight Reel, a fast cut of the best few seconds of each clip (bestBite is what is said in that bite, when known). If the brief has no clips, skip the montage and the award and keep the episode short and warm. Otherwise put every clip in the brief in that one montage by dumplingIds, exactly once, ordered so it builds: a gentle opener, variety in between (alternate people and moods), the funniest or most loved bite last. Give it a short punchy title and a subtitle teaser of a few words. The episode always opens with exactly two segments: first a one-sentence hostLine introduction that welcomes the family and sets up the reel, then the montage itself; everything else comes after the montage. Do not use any other segment type for clips. If any clip is not English, include a titleCard titled exactly "Mother Tongue" with phrase (original words from a clip), romanization (Latin letters) and meaning (English). If the brief has any clips, include award "Golden Dumpling" (most loved clip, set dumplingId; that clip replays in full right after the award, so the award text can set it up). Never nudge or count anyone's folds. Clips marked sealed were hidden until tonight, so reveal them warmly. End with exactly one secretIngredient: next Monday's spark plus a one-line tease. The spark is twelve words or fewer, one concrete action doable in ten seconds anywhere, face optional, never a favorite, opinion or summary of the day, and never a yes or no question. Every hostLine and award text is one sentence, warm and dry, never mean. Use only member names given. For every hostLine, award and secretIngredient, add translations of its text into each captionLanguages code (empty array for other segment types). Set unused fields to null, and dumplingIds to an empty array outside the montage. summary is two sentences for the family's memory.`;
   let feedback = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     const response = await openai("/responses", {
@@ -330,13 +375,19 @@ export const cook = internalAction({
   args: { feastId: v.id("feasts") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const data = await ctx.runQuery(internal.feasts.gather, { feastId: args.feastId });
+    let data = await ctx.runQuery(internal.feasts.gather, { feastId: args.feastId });
     if (!data) return null;
     try {
+      // A clip folded moments ago may not have its bite yet. Pick those now so the reel never plays a guess.
+      const unbitten = data.clips.filter((c) => c.mediaType !== "photo" && !c.bitten).slice(0, 12);
+      if (unbitten.length > 0) {
+        await Promise.all(unbitten.map((c) => pickHighlight(ctx, c.id).catch(() => false)));
+        data = (await ctx.runQuery(internal.feasts.gather, { feastId: args.feastId })) ?? data;
+      }
       const supercut = findSupercut(data);
       const clips = pickClips(data, new Set(supercut?.clips.map((c) => c.id) ?? []));
       const plan = process.env.OPENAI_API_KEY ? await aiPlan(data, clips) : templatePlan(data, clips);
-      const planned = withSupercut(plan.segments, supercut);
+      const planned = withEncore(withSupercut(introThenReel(plan.segments), supercut));
       const segments = process.env.OPENAI_API_KEY ? await voiceLines(ctx, planned) : planned;
       await ctx.runMutation(internal.feasts.finish, { feastId: args.feastId, title: plan.title, segments, secretIngredient: plan.secretIngredient });
       await remember(data.tableId, plan.summary, args.feastId);

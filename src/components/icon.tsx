@@ -4,6 +4,7 @@ import {
   Award,
   Bell,
   Cake,
+  CalendarDays,
   Camera,
   Captions,
   CaptionsOff,
@@ -32,6 +33,7 @@ import {
   Snowflake,
   Sparkles,
   Square,
+  SwitchCamera,
   Sun,
   Trash2,
   UserRound,
@@ -86,11 +88,14 @@ const icons = {
   bell: Bell,
   language: Languages,
   cake: Cake,
+  calendar: CalendarDays,
   clock: Clock,
   offline: WifiOff,
   award: Award,
   ask: MessageCircleQuestion,
   freezer: Snowflake,
+  flip: SwitchCamera,
+  photo: Camera,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;

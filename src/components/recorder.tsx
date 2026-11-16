@@ -1,6 +1,7 @@
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder } from 'expo-audio';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -23,6 +24,36 @@ function VideoReview({ uri }: { uri: string }) {
   });
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
 }
+
+function PhotoReview({ uri }: { uri: string }) {
+  return <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel="Your photo Fold" />;
+}
+
+/** The photo shutter: one tap takes the picture. */
+function ShutterButton({ size, onPress, disabled }: { size: number; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      testID="shutter-button"
+      accessibilityRole="button"
+      accessibilityLabel="Take a photo"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        { width: size, height: size, borderRadius: size / 2, borderWidth: 4, borderColor: Color.nightText, padding: 5 },
+        disabled && { opacity: 0.4 },
+        pressed && { transform: [{ scale: 0.92 }] },
+      ]}>
+      <View style={{ flex: 1, borderRadius: size, backgroundColor: Color.nightText }} />
+    </Pressable>
+  );
+}
+
+type Mode = 'video' | 'photo' | 'audio';
+const MODES: { key: Mode; label: string; icon: 'video' | 'photo' | 'mic' }[] = [
+  { key: 'video', label: 'Video', icon: 'video' },
+  { key: 'photo', label: 'Photo', icon: 'photo' },
+  { key: 'audio', label: 'Voice', icon: 'mic' },
+];
 
 function AudioReview({ uri }: { uri: string }) {
   const player = useAudioPlayer(uri);
@@ -101,7 +132,9 @@ export function Recorder({
   const [micPermission, requestMic] = useMicrophonePermissions();
   const camera = useRef<CameraView>(null);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const [mode, setMode] = useState<'video' | 'audio'>(voiceDefault ? 'audio' : 'video');
+  const [mode, setMode] = useState<Mode>(voiceDefault ? 'audio' : 'video');
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
+  const [snapping, setSnapping] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [phase, setPhase] = useState<'ready' | 'recording' | 'review'>('ready');
   const [take, setTake] = useState<Take | null>(null);
@@ -178,6 +211,23 @@ export function Recorder({
     }
   };
 
+  const snap = async () => {
+    if (!camera.current || !cameraReady || snapping) return;
+    setError(null);
+    setSnapping(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const photo = await camera.current.takePictureAsync({ quality: 0.7, mirror: facing === 'front' });
+      if (!photo?.uri) throw new Error('No photo');
+      setTake({ uri: photo.uri, mediaType: 'photo' });
+      setPhase('review');
+    } catch {
+      setError('The camera could not take that photo. Try again.');
+    } finally {
+      setSnapping(false);
+    }
+  };
+
   const stop = () => {
     if (!live.current) return;
     if (mode === 'video') camera.current?.stopRecording();
@@ -197,8 +247,10 @@ export function Recorder({
     if (live.current && Date.now() - pressedAt.current >= HOLD_MS) stop();
   };
 
-  const needsCamera = mode === 'video' && (!cameraPermission?.granted || !micPermission?.granted);
-  const blocked = mode === 'video' && cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain;
+  const usesCamera = mode !== 'audio';
+  // Photos need only the camera; video also needs the microphone.
+  const needsCamera = usesCamera && (!cameraPermission?.granted || (mode === 'video' && !micPermission?.granted));
+  const blocked = usesCamera && cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain;
   const buttonSize = elder ? 112 : 84;
 
   return (
@@ -207,17 +259,17 @@ export function Recorder({
         {onClose ? <IconButton icon="close" label="Close" tone="dark" onPress={onClose} /> : <View style={{ width: 44 }} />}
         {!elder && phase !== 'review' ? (
           <View style={styles.modes} accessibilityRole="radiogroup">
-            {(['video', 'audio'] as const).map((m) => (
+            {MODES.map((m) => (
               <Pressable
-                key={m}
-                testID={`mode-${m}`}
+                key={m.key}
+                testID={`mode-${m.key}`}
                 accessibilityRole="radio"
-                accessibilityState={{ selected: mode === m }}
+                accessibilityState={{ selected: mode === m.key }}
                 disabled={phase === 'recording'}
-                onPress={() => setMode(m)}
-                style={[styles.mode, mode === m && styles.modeOn]}>
-                <Icon name={m === 'video' ? 'video' : 'mic'} size={16} color={mode === m ? Color.text : Color.nightSoft} />
-                <Text style={[styles.modeText, mode === m && { color: Color.text }]}>{m === 'video' ? 'Video' : 'Voice only'}</Text>
+                onPress={() => setMode(m.key)}
+                style={[styles.mode, mode === m.key && styles.modeOn]}>
+                <Icon name={m.icon} size={16} color={mode === m.key ? Color.text : Color.nightSoft} />
+                <Text style={[styles.modeText, mode === m.key && { color: Color.text }]}>{m.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -241,24 +293,45 @@ export function Recorder({
 
       <View style={styles.stage}>
         {take && phase === 'review' ? (
-          take.mediaType === 'video' ? <VideoReview uri={take.uri} /> : <AudioReview uri={take.uri} />
-        ) : mode === 'video' && !needsCamera ? (
-          <CameraView
-            ref={camera}
-            style={StyleSheet.absoluteFill}
-            facing="front"
-            mode="video"
-            onCameraReady={() => setCameraReady(true)}
-            onMountError={() => {
-              setMode('audio');
-              setError('There is no camera here, so this Fold is voice only.');
-            }}
-          />
-        ) : mode === 'video' ? (
+          take.mediaType === 'video' ? <VideoReview uri={take.uri} /> : take.mediaType === 'photo' ? <PhotoReview uri={take.uri} /> : <AudioReview uri={take.uri} />
+        ) : usesCamera && !needsCamera ? (
+          <>
+            <CameraView
+              ref={camera}
+              style={StyleSheet.absoluteFill}
+              facing={facing}
+              mode={mode === 'photo' ? 'picture' : 'video'}
+              mirror={facing === 'front'}
+              onCameraReady={() => setCameraReady(true)}
+              onMountError={() => {
+                setMode('audio');
+                setError('There is no camera here, so this Fold is voice only.');
+              }}
+            />
+            {phase !== 'recording' && (
+              <Pressable
+                testID="flip-camera"
+                accessibilityRole="button"
+                accessibilityLabel={facing === 'front' ? 'Switch to the back camera' : 'Switch to the front camera'}
+                hitSlop={8}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setFacing((f) => (f === 'front' ? 'back' : 'front'));
+                }}
+                style={({ pressed }) => [styles.flip, pressed && { opacity: 0.7 }]}>
+                <Icon name="flip" size={22} color={Color.nightText} />
+              </Pressable>
+            )}
+          </>
+        ) : usesCamera ? (
           <View style={styles.center}>
             <Icon name="camera" size={28} color={Color.nightSoft} />
             <Txt variant="callout" style={styles.why}>
-              {blocked ? 'Camera access is off for Dumpling. Turn it on in Settings, or use your voice.' : 'Dumpling uses your camera and microphone to film your ten seconds.'}
+              {blocked
+                ? 'Camera access is off for Dumpling. Turn it on in Settings, or use your voice.'
+                : mode === 'photo'
+                  ? 'Dumpling uses your camera to take your photo.'
+                  : 'Dumpling uses your camera and microphone to film your ten seconds.'}
             </Txt>
             <Button
               kind="primary"
@@ -267,7 +340,7 @@ export function Recorder({
               onPress={async () => {
                 if (blocked) return void Linking.openSettings();
                 const cam = await requestCamera();
-                await requestMic();
+                if (mode === 'video') await requestMic();
                 if (!cam.granted && !cam.canAskAgain) setError('Camera is off. You can still Fold with your voice.');
               }}
             />
@@ -303,16 +376,20 @@ export function Recorder({
           </View>
         ) : (
           <>
-            <RecordButton
-              recording={phase === 'recording'}
-              progress={progress}
-              size={buttonSize}
-              onPressIn={onPressIn}
-              onPressOut={onPressOut}
-              disabled={mode === 'video' && (needsCamera || !cameraReady)}
-            />
+            {mode === 'photo' ? (
+              <ShutterButton size={buttonSize} onPress={() => void snap()} disabled={needsCamera || !cameraReady || snapping} />
+            ) : (
+              <RecordButton
+                recording={phase === 'recording'}
+                progress={progress}
+                size={buttonSize}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                disabled={mode === 'video' && (needsCamera || !cameraReady)}
+              />
+            )}
             <Text style={[styles.hint, elder && { fontSize: 18 }]}>
-              {phase === 'recording' ? 'Release or tap to stop' : elder ? 'Hold to record' : 'Hold to record · up to 10 seconds'}
+              {mode === 'photo' ? 'Tap to take a photo' : phase === 'recording' ? 'Release or tap to stop' : elder ? 'Hold to record' : 'Hold to record · up to 10 seconds'}
             </Text>
           </>
         )}
@@ -336,5 +413,6 @@ const styles = StyleSheet.create({
   voiceDisc: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(251,244,236,0.12)', alignItems: 'center', justifyContent: 'center' },
   controls: { alignItems: 'center', gap: Space.sm, paddingHorizontal: Space.gutter, paddingBottom: Space.sm, minHeight: 130, justifyContent: 'center' },
   core: { flex: 1, backgroundColor: Color.brand },
+  flip: { position: 'absolute', top: Space.md, right: Space.md, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(33,21,15,0.55)', alignItems: 'center', justifyContent: 'center' },
   hint: { color: Color.nightSoft, fontSize: 13, fontWeight: '500', fontFamily: Font.ui },
 });

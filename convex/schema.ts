@@ -12,6 +12,13 @@ export const segment = v.union(
     type: v.literal("clip"),
     dumplingId: v.id("dumplings"),
   }),
+  // A highlight reel: the best 3 to 5 seconds of each clip, cut back to back.
+  v.object({
+    type: v.literal("montage"),
+    title: v.string(),
+    subtitle: v.optional(v.string()),
+    dumplingIds: v.array(v.id("dumplings")),
+  }),
   v.object({
     type: v.literal("titleCard"),
     title: v.string(),
@@ -83,6 +90,8 @@ export default defineSchema({
     phone: v.optional(v.string()),
     invitedBy: v.optional(v.id("members")),
     leftAt: v.optional(v.number()),
+    // Profile picture, uploaded from the member's own profile.
+    avatarStorageId: v.optional(v.id("_storage")),
   })
     .index("by_tableId", ["tableId"])
     .index("by_tokenHash", ["tokenHash"]),
@@ -120,14 +129,19 @@ export default defineSchema({
     sparkKey: v.optional(v.string()),
     sparkText: v.optional(v.string()),
     replyTo: v.optional(v.id("dumplings")),
+    // A direct answer to a family member's question.
+    askId: v.optional(v.id("askQueue")),
     sealed: v.optional(v.boolean()),
     hiddenFrom: v.optional(v.array(v.id("members"))),
     mediaStorageId: v.id("_storage"),
-    mediaType: v.union(v.literal("video"), v.literal("audio")),
+    mediaType: v.union(v.literal("video"), v.literal("audio"), v.literal("photo")),
     transcript: v.optional(v.string()),
     language: v.optional(v.string()),
     translation: v.optional(v.record(v.string(), v.string())),
     allowShare: v.optional(v.boolean()),
+    // The best 3 to 5 seconds, in seconds from the start, picked once the clip is processed.
+    highlight: v.optional(v.object({ start: v.number(), end: v.number(), line: v.optional(v.string()) })),
+    duration: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_fillingId_and_memberId", ["fillingId", "memberId"])
@@ -144,6 +158,8 @@ export default defineSchema({
     weekOf: v.string(),
     createdAt: v.number(),
     usedOn: v.optional(v.string()),
+    // The fold that answered it directly, from the "asked you" card. An answered question leaves Today and the spark queue.
+    answeredBy: v.optional(v.id("dumplings")),
   })
     .index("by_authorId_and_weekOf", ["authorId", "weekOf"])
     .index("by_tableId_and_usedOn", ["tableId", "usedOn"]),
@@ -165,7 +181,8 @@ export default defineSchema({
     error: v.optional(v.string()),
     secretIngredient: v.optional(v.string()),
     nextFillingId: v.optional(v.id("fillings")),
-    kind: v.optional(v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion"))),
+    // "special" is an Extra Helping: cooked on demand from the last seven days, on top of the Sunday Feast.
+    kind: v.optional(v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion"), v.literal("special"))),
     createdAt: v.number(),
   }).index("by_tableId_and_weekOf", ["tableId", "weekOf"]),
   phraseAttempts: defineTable({

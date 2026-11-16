@@ -106,7 +106,8 @@ export const context = internalQuery({
       : await ctx.db
           .query("askQueue")
           .withIndex("by_tableId_and_usedOn", (q) => q.eq("tableId", table._id).eq("usedOn", undefined))
-          .take(5);
+          .take(10)
+          .then((rows) => rows.filter((a) => !a.answeredBy).slice(0, 5));
     const existing = await ctx.db
       .query("fillings")
       .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).eq("date", args.date))

@@ -15,6 +15,7 @@ import type * as connectionCheck from "../connectionCheck.js";
 import type * as crons from "../crons.js";
 import type * as dumplings from "../dumplings.js";
 import type * as feasts from "../feasts.js";
+import type * as highlight from "../highlight.js";
 import type * as lib from "../lib.js";
 import type * as members from "../members.js";
 import type * as notify from "../notify.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dumplings: typeof dumplings;
   feasts: typeof feasts;
+  highlight: typeof highlight;
   lib: typeof lib;
   members: typeof members;
   notify: typeof notify;
