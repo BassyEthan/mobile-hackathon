@@ -52,5 +52,6 @@ Set `OPENAI_API_KEY` in your Convex environment variables, then scan the QR code
 
 ## Team
 
-* Eason Gan
 * Ethan Lung
+* Eason Gan
+
