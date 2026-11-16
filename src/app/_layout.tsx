@@ -46,6 +46,7 @@ function RootStack() {
       <Stack.Protected guard={seated}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="table" />
+        <Stack.Screen name="calendar" />
         <Stack.Screen name="member/[id]" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="settings" />

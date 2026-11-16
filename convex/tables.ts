@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { markToday } from "./schedule";
 import {
   LANGUAGES,
+  avatarUrlFor,
   dateInZone,
   fallbackAlternates,
   findMember,
@@ -230,6 +231,7 @@ const meValidator = v.object({
   timeZone: v.string(),
   feastHour: v.number(),
   tableLanguages: v.array(v.string()),
+  avatarUrl: v.union(v.string(), v.null()),
 });
 
 export const me = query({
@@ -263,6 +265,7 @@ export const me = query({
       timeZone: table.timeZone,
       feastHour: table.feastHour ?? 18,
       tableLanguages: table.languages ?? [member.language],
+      avatarUrl: await avatarUrlFor(ctx, member),
     };
   },
 });
@@ -288,6 +291,7 @@ export const seats = query({
       id: v.id("members"),
       displayName: v.string(),
       nickname: v.union(v.string(), v.null()),
+      avatarUrl: v.union(v.string(), v.null()),
       languages: v.array(v.string()),
       role: v.union(v.literal("host"), v.literal("member"), v.literal("guest")),
       isElder: v.boolean(),
@@ -307,6 +311,7 @@ export const seats = query({
         id: m._id,
         displayName: m.displayName,
         nickname: m.nickname ?? null,
+        avatarUrl: await avatarUrlFor(ctx, m),
         languages: m.spokenLanguages ?? [m.motherTongue ?? m.language],
         role: m.role,
         isElder: m.isElder ?? false,
@@ -450,6 +455,31 @@ async function handOverHost(ctx: MutationCtx, member: Doc<"members">) {
   if (next) await ctx.db.patch("members", next._id, { role: "host" });
 }
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Sets (or with `storageId: null`, removes) your profile picture. The file is uploaded first through
+ * dumplings.generateUploadUrl; it must be an image of at most 5 MB. The previous picture is deleted.
+ */
+export const setAvatar = mutation({
+  args: { ...sessionArgs, storageId: v.union(v.id("_storage"), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { member } = await requireMember(ctx, args);
+    if (args.storageId) {
+      const file = await ctx.db.system.get("_storage", args.storageId);
+      if (!file) throw new ConvexError("That picture did not upload. Try again.");
+      if (!file.contentType?.startsWith("image/") || file.size > AVATAR_MAX_BYTES) {
+        await ctx.storage.delete(args.storageId);
+        throw new ConvexError("Pick a photo under 5 MB.");
+      }
+    }
+    if (member.avatarStorageId && member.avatarStorageId !== args.storageId) await ctx.storage.delete(member.avatarStorageId);
+    await ctx.db.patch("members", member._id, { avatarStorageId: args.storageId ?? undefined });
+    return null;
+  },
+});
+
 /** Leaving keeps your past clips in the family's Feasts but gives up your seat. */
 export const leave = mutation({
   args: sessionArgs,
@@ -495,6 +525,7 @@ export const deleteAccount = mutation({
       if (r.audioStorageId) await ctx.storage.delete(r.audioStorageId);
       await ctx.db.delete("reactions", r._id);
     }
+    if (member.avatarStorageId) await ctx.storage.delete(member.avatarStorageId);
     await ctx.db.delete("members", member._id);
     return null;
   },

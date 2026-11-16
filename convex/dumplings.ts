@@ -21,10 +21,11 @@ export const fold = mutation({
   args: {
     ...sessionArgs,
     storageId: v.id("_storage"),
-    mediaType: v.union(v.literal("video"), v.literal("audio")),
+    mediaType: v.union(v.literal("video"), v.literal("audio"), v.literal("photo")),
     fillingId: v.optional(v.id("fillings")),
     sparkKey: v.optional(v.string()),
     replyTo: v.optional(v.id("dumplings")),
+    askId: v.optional(v.id("askQueue")),
   },
   returns: v.id("dumplings"),
   handler: async (ctx, args) => {
@@ -49,6 +50,12 @@ export const fold = mutation({
     } else if (args.sparkKey !== undefined) {
       throw new ConvexError("Pick one of today's sparks.");
     }
+    const ask = args.askId ? await ctx.db.get("askQueue", args.askId) : null;
+    if (args.askId) {
+      if (args.fillingId || args.replyTo) throw new ConvexError("Answer the question, or the spark, one at a time.");
+      if (!ask || ask.tableId !== table._id || (ask.addressedTo && ask.addressedTo !== member._id)) throw new ConvexError("That question is not for you.");
+      if (ask.answeredBy) throw new ConvexError("You already answered that question.");
+    }
     const parent = args.replyTo ? await ctx.db.get("dumplings", args.replyTo) : null;
     if (args.replyTo && (!parent || !(await canSeeDumpling(ctx, member, parent)))) throw new ConvexError("That clip is not open to you.");
     const firstToday = !(await foldedOn(ctx, member._id, date));
@@ -58,6 +65,10 @@ export const fold = mutation({
       await ctx.storage.delete(args.storageId);
       throw new ConvexError("That clip is too large.");
     }
+    if (args.mediaType === "photo" && !file.contentType?.startsWith("image/")) {
+      await ctx.storage.delete(args.storageId);
+      throw new ConvexError("That photo did not upload properly. Try again.");
+    }
     await markToday(ctx, table, now);
     const dumplingId = await ctx.db.insert("dumplings", {
       tableId: table._id,
@@ -66,11 +77,14 @@ export const fold = mutation({
       answeredSpark: spark !== null,
       ...(spark ?? {}),
       ...(args.replyTo ? { replyTo: args.replyTo } : {}),
+      ...(ask ? { askId: ask._id, sparkText: ask.text } : {}),
       mediaStorageId: args.storageId,
       mediaType: args.mediaType,
       createdAt: now,
     });
+    if (ask) await ctx.db.patch("askQueue", ask._id, { answeredBy: dumplingId });
     await ctx.scheduler.runAfter(0, internal.ai.processDumpling, { dumplingId });
+    if (args.mediaType !== "photo") await ctx.scheduler.runAfter(0, internal.ai.findHighlight, { dumplingId });
     const url = `/clip/${dumplingId}?date=${date}`;
     if (parent && parent.memberId !== member._id) {
       await notify(ctx, {

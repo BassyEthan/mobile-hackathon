@@ -16,7 +16,7 @@ import { api } from '../../convex/_generated/api';
  * sending.
  */
 export default function Fold() {
-  const params = useLocalSearchParams<{ fillingId?: string; sparkKey?: string; replyTo?: string; prompt?: string }>();
+  const params = useLocalSearchParams<{ fillingId?: string; sparkKey?: string; replyTo?: string; prompt?: string; askId?: string }>();
   const insets = useSafeAreaInsets();
   const { auth } = useSession();
   const me = useMe();
@@ -42,7 +42,8 @@ export default function Fold() {
         onClose={close}
         onDone={(take, sparkKept) => {
           void outbox.enqueue(take, {
-            ...(sparkKept && spark?.fillingId ? { fillingId: spark.fillingId, sparkKey: spark.key } : {}),
+            // Answering a family member's question: keeping it on screen links the clip to it, and the question is done.
+            ...(sparkKept && params.askId ? { askId: params.askId } : sparkKept && spark?.fillingId ? { fillingId: spark.fillingId, sparkKey: spark.key } : {}),
             ...(params.replyTo ? { replyTo: params.replyTo } : {}),
           });
           router.dismissTo('/');

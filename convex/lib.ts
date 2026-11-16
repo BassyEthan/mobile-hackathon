@@ -195,6 +195,13 @@ export async function canSeeDumpling(
   const date = await dumplingDate(ctx, dumpling);
   const table = await ctx.db.get("tables", member.tableId);
   if (!date || !table) return false;
-  if (!(await isDayOpen(ctx, table, date))) return true;
+  // The Sunday Feast is the family's shared show: once a day has closed, its clips play there for everyone.
+  if (options.inFeast && !(await isDayOpen(ctx, table, date))) return true;
+  // Everywhere else, a day's clips open only for people who folded that day, today or any day before it.
   return await foldedOn(ctx, member._id, date);
+}
+
+/** A member's profile picture URL, or null when they have not added one. */
+export async function avatarUrlFor(ctx: QueryCtx, member: Doc<"members"> | null) {
+  return member?.avatarStorageId ? await ctx.storage.getUrl(member.avatarStorageId) : null;
 }

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
 import { ConvexError } from 'convex/values';
 import { router, useFocusEffect, type ErrorBoundaryProps } from 'expo-router';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -55,9 +56,12 @@ function monthOf(weekOf: string) {
 function HeroFeast({ feast, busy, onRetry }: { feast: FeastRow; busy: boolean; onRetry: () => void }) {
   const { auth } = useSession();
   const episode = useQuery(api.feasts.get, auth && feast.status === 'ready' ? { ...auth, feastId: feast.id } : 'skip');
-  const cover = episode?.segments.find((s) => s.type === 'clip' && s.dumpling.mediaType === 'video');
-  const coverUrl = cover?.type === 'clip' ? cover.dumpling.url : null;
-  const label = feast.kind === 'banquet' ? 'Monthly Banquet' : feast.kind === 'reunion' ? 'Yearly Reunion' : feast.isPilot ? 'Your Pilot' : 'Sunday Feast';
+  // Prefer a video for the cover; a photo works too.
+  const shown = episode?.segments.flatMap((s) => (s.type === 'clip' ? [s.dumpling] : s.type === 'montage' ? s.cuts.map((c) => c.dumpling) : [])) ?? [];
+  const cover = shown.find((d) => d.mediaType === 'video') ?? shown.find((d) => d.mediaType === 'photo');
+  const coverUrl = cover?.url ?? null;
+  const coverIsPhoto = cover?.mediaType === 'photo';
+  const label = feastLabel(feast);
 
   if (feast.status === 'cooking') {
     return (
@@ -88,11 +92,11 @@ function HeroFeast({ feast, busy, onRetry }: { feast: FeastRow; busy: boolean; o
   return (
     <View testID="latest-feast" style={styles.hero}>
       <Pressable accessibilityRole="button" accessibilityLabel={`Play ${feast.title}`} onPress={() => play(feast.id)} style={({ pressed }) => [styles.heroArt, pressed && { opacity: 0.92 }]}>
-        {coverUrl ? <Cover url={coverUrl} /> : <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}><Mascot size={96} steaming={false} /></View>}
+        {coverUrl ? (coverIsPhoto ? <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Cover url={coverUrl} />) : <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}><Mascot size={96} steaming={false} /></View>}
         <View style={styles.heroOverlay}>
-          <Text style={styles.heroLabel}>{label} · Week {feast.weekNumber}</Text>
+          <Text style={styles.heroLabel}>{label}{feast.kind === 'special' ? '' : ` · Week ${feast.weekNumber}`}</Text>
           <Text style={styles.heroTitle} numberOfLines={3} testID="latest-feast-title">{feast.title}</Text>
-          <Text style={styles.heroMeta}>Week of {longDate(feast.weekOf)}</Text>
+          <Text style={styles.heroMeta}>{when(feast)}</Text>
         </View>
       </Pressable>
       <View style={styles.heroBody}>
@@ -100,6 +104,18 @@ function HeroFeast({ feast, busy, onRetry }: { feast: FeastRow; busy: boolean; o
       </View>
     </View>
   );
+}
+
+function feastLabel(feast: FeastRow) {
+  if (feast.kind === 'banquet') return 'Monthly Banquet';
+  if (feast.kind === 'reunion') return 'Yearly Reunion';
+  if (feast.kind === 'special') return 'Extra Helping';
+  return feast.isPilot ? 'Your Pilot' : 'Sunday Feast';
+}
+
+/** Sunday Feasts cover a week; an Extra Helping is cooked on a day and covers the seven before it. */
+function when(feast: FeastRow) {
+  return feast.kind === 'special' ? `Cooked ${longDate(feast.weekOf)}` : `Week of ${longDate(feast.weekOf)}`;
 }
 
 function LeftoverRow({ feast }: { feast: FeastRow }) {
@@ -113,12 +129,18 @@ function LeftoverRow({ feast }: { feast: FeastRow }) {
       onPress={() => play(feast.id)}
       style={({ pressed }) => [styles.leftover, pressed && { opacity: 0.6 }]}>
       <View style={styles.weekBadge}>
-        <Text style={styles.weekNum}>{feast.weekNumber}</Text>
-        <Text style={styles.weekLabel}>Week</Text>
+        {feast.kind === 'special' ? (
+          <Icon name="feast" size={22} color={Color.ink} />
+        ) : (
+          <>
+            <Text style={styles.weekNum}>{feast.weekNumber}</Text>
+            <Text style={styles.weekLabel}>Week</Text>
+          </>
+        )}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Txt variant="callout" numberOfLines={2} style={{ fontWeight: '600' }}>{feast.title}</Txt>
-        <Txt variant="meta">{ready ? `Week of ${longDate(feast.weekOf)}` : feast.status === 'cooking' ? 'Cooking…' : 'Did not cook'}</Txt>
+        <Txt variant="meta">{ready ? (feast.kind === 'special' ? `Extra Helping · ${when(feast)}` : when(feast)) : feast.status === 'cooking' ? 'Cooking…' : 'Did not cook'}</Txt>
       </View>
       {ready && <Icon name="play" size={18} color={Color.brandDeep} />}
     </Pressable>
@@ -138,7 +160,13 @@ function Freezer({ date }: { date: string }) {
       onPress={() => router.push({ pathname: '/clip/[id]', params: { id: d.id, date: pick.date } })}
       style={({ pressed }) => [styles.freezer, pressed && { opacity: 0.85 }]}>
       <View style={styles.freezerThumb}>
-        {d.mediaType === 'video' && d.url ? <Cover url={d.url} /> : <Icon name="voice" size={22} color={Color.brandDeep} />}
+        {d.mediaType === 'video' && d.url ? (
+          <Cover url={d.url} />
+        ) : d.mediaType === 'photo' && d.url ? (
+          <Image source={{ uri: d.url }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <Icon name="voice" size={22} color={Color.brandDeep} />
+        )}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -159,6 +187,7 @@ export default function Feast() {
   const feasts = useQuery(api.feasts.list, auth ?? 'skip');
   const upcoming = useQuery(api.feasts.upcoming, auth && date ? { ...auth, date } : 'skip');
   const cook = useMutation(api.feasts.cook);
+  const cookSpecial = useMutation(api.feasts.cookSpecial);
   const retry = useMutation(api.feasts.retry);
   const { markFeast } = useSeen();
   const [busy, setBusy] = useState(false);
@@ -189,11 +218,13 @@ export default function Feast() {
     }
   };
 
-  const weekly = feasts.filter((f) => f.kind === 'weekly');
-  const pinned = feasts.filter((f) => f.kind !== 'weekly' && f.status === 'ready');
-  const current = weekly.find((f) => f.weekOf === upcoming?.weekOf && f.status !== 'ready');
-  const hero = current ?? weekly.find((f) => f.status === 'ready') ?? null;
-  const leftovers = weekly.filter((f) => f.id !== hero?.id);
+  // Sunday Feasts and Extra Helpings share one timeline; Banquets and Reunions are pinned above it.
+  const timeline = feasts.filter((f) => f.kind === 'weekly' || f.kind === 'special');
+  const weekly = timeline.filter((f) => f.kind === 'weekly');
+  const pinned = feasts.filter((f) => f.kind !== 'weekly' && f.kind !== 'special' && f.status === 'ready');
+  const current = timeline.find((f) => f.status === 'cooking') ?? weekly.find((f) => f.weekOf === upcoming?.weekOf && f.status !== 'ready');
+  const hero = current ?? timeline.find((f) => f.status === 'ready') ?? null;
+  const leftovers = timeline.filter((f) => f.id !== hero?.id);
   const months = new Map<string, FeastRow[]>();
   for (const f of leftovers) months.set(monthOf(f.weekOf), [...(months.get(monthOf(f.weekOf)) ?? []), f]);
   const cooking = feasts.some((f) => f.status === 'cooking');
@@ -247,8 +278,15 @@ export default function Feast() {
         </View>
       )}
 
-      {!thisWeekReady && !cooking && (
-        <LinkButton testID="cook-now" icon="feast" label={feasts.length === 0 ? 'Cook a Pilot now' : 'Cook this week’s Feast early'} onPress={() => auth && void run(() => cook({ ...auth }))} />
+      {!cooking && (
+        <View style={{ gap: Space.xs }}>
+          {thisWeekReady ? (
+            <LinkButton testID="cook-special" icon="feast" label="Cook an Extra Helping now" onPress={() => auth && void run(() => cookSpecial({ ...auth }))} />
+          ) : (
+            <LinkButton testID="cook-now" icon="feast" label={feasts.length === 0 ? 'Cook a Pilot now' : 'Cook this week’s Feast early'} onPress={() => auth && void run(() => cook({ ...auth }))} />
+          )}
+          {thisWeekReady && <Txt variant="meta">A fresh highlight reel from the last seven days, any time you want one. Sunday’s Feast still comes as usual.</Txt>}
+        </View>
       )}
       {error && <Txt variant="meta" style={{ color: Color.danger }}>{error}</Txt>}
 

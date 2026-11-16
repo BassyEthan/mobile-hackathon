@@ -12,12 +12,13 @@ import { uploadToConvex } from '@/lib/upload';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 
-export type Take = { uri: string; mediaType: 'video' | 'audio' };
-export type FoldParams = { fillingId?: string; sparkKey?: string; replyTo?: string };
+export type MediaType = 'video' | 'audio' | 'photo';
+export type Take = { uri: string; mediaType: MediaType };
+export type FoldParams = { fillingId?: string; sparkKey?: string; replyTo?: string; askId?: string };
 export type OutboxItem = {
   id: string;
   uri: string;
-  mediaType: 'video' | 'audio';
+  mediaType: MediaType;
   params: FoldParams;
   createdAt: number;
   state: 'waiting' | 'sending' | 'failed';
@@ -48,7 +49,7 @@ async function keepFile(take: Take, id: string) {
   try {
     const dir = new Directory(Paths.document, 'outbox');
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
-    const target = new File(dir, `${id}.${take.mediaType === 'video' ? 'mov' : 'm4a'}`);
+    const target = new File(dir, `${id}.${take.mediaType === 'video' ? 'mov' : take.mediaType === 'photo' ? 'jpg' : 'm4a'}`);
     await new File(take.uri).copy(target);
     return target.uri;
   } catch {
@@ -104,17 +105,19 @@ export function OutboxProvider({ children }: { children: ReactNode }) {
     update(next.id, { state: 'sending', progress: 0, error: undefined });
     try {
       const url = await generateUploadUrl({ ...auth });
-      const storageId = (await uploadToConvex(url, next.uri, next.mediaType === 'video' ? 'video/quicktime' : 'audio/mp4', (p) => update(next.id, { progress: p }))) as Id<'_storage'>;
+      const storageId = (await uploadToConvex(url, next.uri, next.mediaType === 'video' ? 'video/quicktime' : next.mediaType === 'photo' ? 'image/jpeg' : 'audio/mp4', (p) => update(next.id, { progress: p }))) as Id<'_storage'>;
       const base = { ...auth, storageId, mediaType: next.mediaType };
       const withSpark = next.params.fillingId
         ? { fillingId: next.params.fillingId as Id<'fillings'>, ...(next.params.sparkKey ? { sparkKey: next.params.sparkKey } : {}) }
         : {};
       const reply = next.params.replyTo ? { replyTo: next.params.replyTo as Id<'dumplings'> } : {};
+      const answer = next.params.askId ? { askId: next.params.askId as Id<'askQueue'> } : {};
       try {
-        await fold({ ...base, ...withSpark, ...reply });
+        await fold({ ...base, ...withSpark, ...reply, ...answer });
       } catch (e) {
-        // A spark from yesterday or a deleted parent should not lose the clip: post it as a free Fold instead.
-        if (permanent(e) && (next.params.fillingId || next.params.replyTo)) await fold(base);
+        // A spark from yesterday, a deleted parent or an already-answered question should not lose the clip: post it as a
+        // free Fold instead.
+        if (permanent(e) && (next.params.fillingId || next.params.replyTo || next.params.askId)) await fold(base);
         else throw e;
       }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

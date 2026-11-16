@@ -3,6 +3,7 @@ import { useEvent } from 'expo';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, FlatList, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -83,10 +84,18 @@ function AudioStage({ url, active }: { url: string; active: boolean }) {
   );
 }
 
+/** What a clip is about, for the top of the viewer: the question it answers, the clip it folds back to, or just a fold. */
+function headingFor(clip: ViewerClip) {
+  if (clip.replyToName) return { eyebrow: 'Fold back', text: `Folding back to ${clip.replyToName}` };
+  if (clip.spark) return { eyebrow: clip.askedBy ? `${clip.askedBy} asked` : 'Answering the spark', text: clip.spark };
+  return { eyebrow: null, text: 'A fold' };
+}
+
 function ClipPage({ clip, active, mine, width, height }: { clip: ViewerClip; active: boolean; mine: boolean; width: number; height: number }) {
   const { auth } = useSession();
   const insets = useSafeAreaInsets();
   const remove = useMutation(api.dumplings.remove);
+  const heading = headingFor(clip);
   const setShare = useMutation(api.dumplings.setShare);
   const menu = () => {
     Alert.alert('Your clip', undefined, [
@@ -108,13 +117,21 @@ function ClipPage({ clip, active, mine, width, height }: { clip: ViewerClip; act
   };
   return (
     <View style={{ width, height }} testID={`viewer-${clip.id}`}>
-      {clip.url ? clip.mediaType === 'video' ? <VideoStage url={clip.url} active={active} /> : <AudioStage url={clip.url} active={active} /> : null}
+      {clip.url ? (
+        clip.mediaType === 'video' ? (
+          <VideoStage url={clip.url} active={active} />
+        ) : clip.mediaType === 'photo' ? (
+          <Image source={{ uri: clip.url }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityLabel={`Photo from ${clip.memberName}`} />
+        ) : (
+          <AudioStage url={clip.url} active={active} />
+        )
+      ) : null}
       <View style={[styles.top, { paddingTop: insets.top + Space.sm }]} pointerEvents="box-none">
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.name} numberOfLines={1}>{mine ? 'You' : clip.memberName}</Text>
+        <View style={{ flex: 1, gap: 4 }} testID="clip-heading">
+          {heading.eyebrow && <Text style={styles.eyebrow} numberOfLines={1}>{heading.eyebrow}</Text>}
+          <Text style={[styles.heading, !heading.eyebrow && { fontSize: 20 }]} numberOfLines={3} accessibilityRole="header">{heading.text}</Text>
           <Text style={styles.meta} numberOfLines={1}>
-            {new Date(clip.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            {clip.replyToName ? ` · folding back to ${clip.replyToName}` : clip.spark ? ` · ${clip.spark}` : ''}
+            {mine ? 'You' : clip.memberName} · {new Date(clip.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </Text>
         </View>
         {mine && <IconButton icon="more" label="Clip options" tone="dark" filled onPress={menu} testID="clip-menu" />}
@@ -177,6 +194,7 @@ export default function ClipViewer() {
   if (!day || !me) return <View style={styles.root}><Loading dark /></View>;
 
   if (!day.lidOff) {
+    const pastDay = !!today && date !== today;
     const folded = day.members.filter((m) => m.folded && !m.isMe).map((m) => m.displayName);
     return (
       <View style={[styles.root, { justifyContent: 'center', padding: Space.xl }]}>
@@ -184,9 +202,9 @@ export default function ClipViewer() {
         <StateView
           dark
           icon="lock"
-          title={folded.length ? `${folded.join(', ')} folded today` : 'Today’s moments are under the lid'}
-          body="Fold anything of your own and the lid lifts, so you can see everyone’s."
-          action={<Button icon="video" label="Fold to lift the lid" onPress={() => router.replace('/fold')} />}
+          title={pastDay ? 'This day stayed under the lid' : folded.length ? `${folded.join(', ')} folded today` : 'Today’s moments are under the lid'}
+          body={pastDay ? 'You didn’t fold that day, so its moments stay closed. They still play in the Sunday Feast.' : 'Fold anything of your own and the lid lifts, so you can see everyone’s.'}
+          action={pastDay ? undefined : <Button icon="video" label="Fold to lift the lid" onPress={() => router.replace('/fold')} />}
         />
         <Button kind="onDark" label="Close" onPress={close} />
       </View>
@@ -235,7 +253,9 @@ const styles = StyleSheet.create({
   paused: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   audioStage: { alignItems: 'center', justifyContent: 'center', backgroundColor: Color.nightSurface },
   voiceDisc: { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(251,244,236,0.1)', alignItems: 'center', justifyContent: 'center' },
-  top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingHorizontal: Space.lg, paddingBottom: Space.xl, backgroundColor: 'rgba(23,17,14,0.35)' },
+  eyebrow: { color: Color.gold, fontSize: 12, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', fontFamily: Font.ui },
+  heading: { color: Color.nightText, fontSize: 18, lineHeight: 24, fontWeight: '700', fontFamily: Font.ui },
+  top: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', gap: Space.sm, paddingHorizontal: Space.lg, paddingBottom: Space.xl, backgroundColor: 'rgba(23,17,14,0.35)' },
   name: { color: Color.nightText, fontSize: 17, fontWeight: '600', fontFamily: Font.ui },
   meta: { color: Color.nightSoft, fontSize: 13, fontWeight: '500', fontFamily: Font.ui },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: Space.lg, paddingTop: Space.xl, gap: Space.md, backgroundColor: 'rgba(23,17,14,0.55)' },

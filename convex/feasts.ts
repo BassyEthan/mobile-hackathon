@@ -4,7 +4,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import { segment } from "./schema";
 import { addDays, canSeeDumpling, dateInZone, isDate, isDayOpen, seatLine, requireMember, sessionArgs, tableMembers, weekOfFor } from "./lib";
 import { notify } from "./notify";
-import { startCook } from "./schedule";
+import { startCook, startSpecial } from "./schedule";
 import { describeDumpling, revealedDumpling, tableWeek } from "./today";
 
 const feastSummary = v.object({
@@ -15,7 +15,7 @@ const feastSummary = v.object({
   error: v.union(v.string(), v.null()),
   segmentCount: v.number(),
   weekNumber: v.number(),
-  kind: v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion")),
+  kind: v.union(v.literal("weekly"), v.literal("banquet"), v.literal("reunion"), v.literal("special")),
   isPilot: v.boolean(),
   createdAt: v.number(),
 });
@@ -50,6 +50,20 @@ const playableSegment = v.union(
   v.object({ type: v.literal("hostLine"), text: v.string(), audioUrl: v.union(v.string(), v.null()) }),
   v.object({ type: v.literal("clip"), dumpling: revealedDumpling }),
   v.object({
+    type: v.literal("montage"),
+    title: v.string(),
+    subtitle: v.union(v.string(), v.null()),
+    cuts: v.array(
+      v.object({
+        dumpling: revealedDumpling,
+        // Seconds into the clip. Null when the highlight is not picked yet; the player then finds its own bite.
+        start: v.union(v.number(), v.null()),
+        end: v.union(v.number(), v.null()),
+        line: v.union(v.string(), v.null()),
+      }),
+    ),
+  }),
+  v.object({
     type: v.literal("titleCard"),
     title: v.string(),
     subtitle: v.union(v.string(), v.null()),
@@ -71,6 +85,7 @@ export const get = query({
       status: v.string(),
       weekOf: v.string(),
       weekNumber: v.number(),
+      special: v.boolean(),
       segments: v.array(playableSegment),
     }),
   ),
@@ -91,6 +106,22 @@ export const get = query({
         if (dumpling && (await canSeeDumpling(ctx, member, dumpling, { inFeast: feast.status === "ready" }))) {
           segments.push({ type: s.type, dumpling: await describeDumpling(ctx, member, dumpling) });
         }
+      } else if (s.type === "montage") {
+        const cuts = [];
+        for (const dumplingId of s.dumplingIds) {
+          const dumpling = await ctx.db.get("dumplings", dumplingId);
+          if (!dumpling || !(await canSeeDumpling(ctx, member, dumpling, { inFeast: feast.status === "ready" }))) continue;
+          const h = dumpling.highlight;
+          // The spoken line only helps when it is in the viewer's language; otherwise the lower third carries the name alone.
+          const sameLanguage = !dumpling.language || dumpling.language === member.language;
+          cuts.push({
+            dumpling: await describeDumpling(ctx, member, dumpling),
+            start: h?.start ?? null,
+            end: h?.end ?? null,
+            line: h?.line && sameLanguage ? h.line : null,
+          });
+        }
+        if (cuts.length > 0) segments.push({ type: s.type, title: s.title, subtitle: s.subtitle ?? null, cuts });
       } else if (s.type === "titleCard") {
         segments.push({
           type: s.type,
@@ -108,7 +139,7 @@ export const get = query({
         segments.push({ type: s.type, prompt: s.prompt, text: s.translations?.[member.language] ?? s.text });
       }
     }
-    return { title: feast.title, chefName: table.chefName, status: feast.status, weekOf: feast.weekOf, weekNumber: tableWeek(table, feast.weekOf), segments };
+    return { title: feast.title, chefName: table.chefName, status: feast.status, weekOf: feast.weekOf, weekNumber: tableWeek(table, feast.weekOf), special: feast.kind === "special", segments };
   },
 });
 
@@ -118,6 +149,16 @@ export const cook = mutation({
   handler: async (ctx, args) => {
     const { table } = await requireMember(ctx, args);
     return await startCook(ctx, table, Date.now());
+  },
+});
+
+/** Cook an Extra Helping right now, any day, as often as the family likes (with a short cooldown). */
+export const cookSpecial = mutation({
+  args: sessionArgs,
+  returns: v.id("feasts"),
+  handler: async (ctx, args) => {
+    const { table } = await requireMember(ctx, args);
+    return await startSpecial(ctx, table, Date.now());
   },
 });
 
@@ -149,6 +190,8 @@ const gatheredClip = v.object({
   english: v.union(v.string(), v.null()),
   reactionCount: v.number(),
   voiceCount: v.number(),
+  highlight: v.union(v.string(), v.null()),
+  bitten: v.boolean(),
 });
 
 export const gather = internalQuery({
@@ -178,8 +221,12 @@ export const gather = internalQuery({
       .withIndex("by_tableId_and_date", (q) => q.eq("tableId", table._id).gte("date", addDays(feast.weekOf, -6)).lte("date", feast.weekOf))
       .take(80);
     const clips = [];
+    const special = feast.kind === "special";
     for (const d of dumplings) {
-      if (!d.date || (await isDayOpen(ctx, table, d.date))) continue;
+      if (!d.date) continue;
+      // The Sunday Feast waits for each day to close. An Extra Helping is cooked on demand, so it takes today's folds too,
+      // except sealed and hidden ones, which stay put until the Sunday Feast.
+      if (special ? d.sealed || d.hiddenFrom?.length : await isDayOpen(ctx, table, d.date)) continue;
       const filling = !d.sparkText && d.fillingId && d.answeredSpark !== false ? await ctx.db.get("fillings", d.fillingId) : null;
       const reactions = await ctx.db.query("reactions").withIndex("by_dumplingId", (q) => q.eq("dumplingId", d._id)).take(200);
       clips.push({
@@ -196,6 +243,8 @@ export const gather = internalQuery({
         english: d.language === "en" ? (d.transcript ?? null) : (d.translation?.en ?? null),
         reactionCount: reactions.length,
         voiceCount: reactions.filter((r) => r.audioStorageId).length,
+        highlight: d.highlight?.line ?? null,
+        bitten: !!d.highlight,
       });
     }
     const previousFeast = (
@@ -216,7 +265,7 @@ export const gather = internalQuery({
         ? {
             title: previousFeast.title,
             secretIngredient: previousFeast.secretIngredient ?? null,
-            lines: previousFeast.segments.flatMap((s) => (s.type === "hostLine" ? [s.text] : s.type === "award" ? [`${s.award}: ${s.memberName}`] : [])),
+            lines: previousFeast.segments.flatMap((s) => (s.type === "hostLine" ? [s.text] : s.type === "award" ? [`${s.award}: ${s.memberName}`] : s.type === "montage" ? [`${s.title}${s.subtitle ? `: ${s.subtitle}` : ""}`] : [])),
           }
         : null,
     };

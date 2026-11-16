@@ -1,12 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
-import { canSeeDumpling, requireMember, sessionArgs } from "./lib";
+import { avatarUrlFor, canSeeDumpling, requireMember, sessionArgs } from "./lib";
 import { segmentsByMember } from "./tables";
 
 const tile = v.object({
   id: v.id("dumplings"),
-  mediaType: v.union(v.literal("video"), v.literal("audio")),
+  mediaType: v.union(v.literal("video"), v.literal("audio"), v.literal("photo")),
   url: v.union(v.string(), v.null()),
   date: v.string(),
   caption: v.union(v.string(), v.null()),
@@ -25,6 +25,7 @@ export const profile = query({
       id: v.id("members"),
       displayName: v.string(),
       nickname: v.union(v.string(), v.null()),
+      avatarUrl: v.union(v.string(), v.null()),
       languages: v.array(v.string()),
       role: v.union(v.literal("host"), v.literal("member"), v.literal("guest")),
       isMe: v.boolean(),
@@ -107,6 +108,7 @@ export const profile = query({
       id: target._id,
       displayName: target.displayName,
       nickname: target.nickname ?? null,
+      avatarUrl: await avatarUrlFor(ctx, target),
       languages: target.spokenLanguages ?? [target.motherTongue ?? target.language],
       role: target.role,
       isMe,

@@ -103,7 +103,7 @@ export default function TableScreen() {
             {i > 0 && <Divider />}
             <Row
               testID={`seat-${s.id}`}
-              leading={<Avatar name={s.displayName} size={44} folded={s.foldedToday} />}
+              leading={<Avatar name={s.displayName} uri={s.avatarUrl} size={44} folded={s.foldedToday} />}
               title={s.isMe ? `${s.displayName} (you)` : s.displayName}
               detail={[
                 s.nickname ? `Called ${s.nickname}` : null,

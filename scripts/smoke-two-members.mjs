@@ -97,7 +97,7 @@ check("one Feast row for this week", feasts.filter((f) => f.id === first).length
 const cooked = await next(api.feasts.list, a, (list) => list[0]?.status !== "cooking", 120000);
 check(`Feast finished cooking (${cooked[0].status})`, cooked[0].status === "ready");
 const feast = await http.query(api.feasts.get, { ...b, feastId: first });
-check("Feast never includes clips from today's open day", !feast.segments.some((s) => s.type === "clip"));
+check("Feast never includes clips from today's open day", !feast.segments.some((s) => s.type === "clip" || s.type === "montage"));
 check("Feast seats folks who did not fold with a Chef line, no Empty Plate", feast.segments.every((s) => s.type !== "award" || s.award !== "Empty Plate"));
 check("unknown token is rejected", await rejects(http.query(api.today.get, { token: "not-a-member", memberId: a.memberId, date: today })));
 await live.close();
